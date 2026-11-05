@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FIELD_OPTIONS, ITEMS, VALUE_OPTIONS } from "@/lib/items";
+import { localToday } from "@/lib/date";
 import { recommend } from "@/lib/recommend";
 import type {
   Budget,
@@ -9,6 +10,7 @@ import type {
   Item,
   Recommendation,
 } from "@/lib/types";
+import { LogSection, RecordButton } from "./Log";
 import styles from "./page.module.css";
 
 const BUDGETS: { value: Budget; label: string }[] = [
@@ -62,6 +64,9 @@ function Card({ rec, support }: { rec: Recommendation; support?: boolean }) {
           {costLabel(cheaperAlt)})
         </p>
       )}
+      {item.kind === "challenge" && (
+        <RecordButton itemId={item.id} title={item.name} />
+      )}
       {item.sourceUrl && (
         <p className={styles.meta}>
           <a href={item.sourceUrl} target="_blank" rel="noreferrer">
@@ -99,7 +104,7 @@ export default function Home() {
     if (!submitted || budget === null || hours === null || equipment === null) {
       return null;
     }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday();
     return recommend(
       ITEMS,
       { fields, values, constraints: { budget, hoursPerWeek: hours, equipment } },
@@ -274,6 +279,8 @@ export default function Home() {
           )}
         </section>
       )}
+
+      <LogSection />
 
       <footer className={styles.foot}>
         추천은 확인된 목록 안에서만 해. 정보는 마지막 확인일 기준이야.
