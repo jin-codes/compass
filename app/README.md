@@ -1,36 +1,27 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Compass 웹앱
 
-## Getting Started
+직업 하나를 찍어주는 대신, 시야를 넓히고 해볼 거리를 주는 진로 탐색 서비스. 서비스 원칙과 미정 사항은 저장소 루트의 `CLAUDE.md`를 따른다.
 
-First, run the development server:
+## 동작
+
+- 흥미 분야·가치관을 고르고, 시간·예산·장비를 제약 조건으로 한 번 입력한다.
+- `lib/items.ts`의 검증된 목록 안에서만 추천한다 (`lib/recommend.ts`).
+  - `verified: true`가 아닌 항목은 게시하지 않는다.
+  - 외부 항목(활동·공모전·지원)은 출처 링크와 마지막 확인일이 없으면 게시하지 않는다.
+  - 마감이 지난 항목은 숨긴다. 오늘 마감은 보인다.
+  - 예산을 넘는 항목은 숨기지 않고 "지원받으면 가능한 길"로 보여주며, 더 싼 경로를 함께 붙인다.
+- "내 기록": 해본 것을 남기고 텍스트로 복사한다. 이 브라우저의 localStorage에만 저장되고 서버로 보내지 않는다 (`lib/log.ts`).
+
+## 현재 데이터
+
+- 도전(`challenge`) 24개. 외부 정보가 아니라 스스로 해보는 것이라 출처가 필요 없다.
+- 외부 항목(`activity` / `contest` / `support`)은 아직 없다. 수집 단서는 `../data-candidates.md`에 있고 모두 미검증이다. 원문을 확인한 뒤에만 `items.ts`에 추가한다.
+
+## 실행
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # http://localhost:3000
+npm test        # 추천 규칙 테스트
+npm run lint
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
