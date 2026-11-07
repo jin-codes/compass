@@ -100,6 +100,23 @@ test("build: 이유는 목록 안의 항목에만 붙고 상위 3개까지만 �
   if (withReason) assert.equal(withReason.reason, "이유");
 });
 
+test("build: AI가 이유를 쓴 항목이 먼저 나오고 나머지는 기존 순서를 지킨다", () => {
+  const list = [
+    ch("a", ["데이터·분석"]),
+    ch("b", ["데이터·분석"]),
+    ch("c", ["데이터·분석"]),
+    ch("d", ["데이터·분석"]),
+  ];
+  const reading: Reading = {
+    fields: ["데이터·분석"],
+    values: [],
+    reasons: [{ id: "c", reason: "이유" }],
+  };
+  const s = build(list, reading, free, TODAY, "ai");
+  assert.equal(s.within[0].id, "c");
+  assert.deepEqual(s.within.slice(1).map((p) => p.id), ["a", "b"]);
+});
+
 test("build: 읽어낸 게 없으면 추천도 없다", () => {
   const s = build(items, { fields: [], values: [], reasons: [] }, free, TODAY, "basic");
   assert.equal(s.within.length, 0);

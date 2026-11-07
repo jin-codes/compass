@@ -122,13 +122,16 @@ export function build(
   );
   const reasonOf = new Map(reading.reasons.map((r) => [r.id, r.reason]));
   const pick = (id: string): Pick => ({ id, reason: reasonOf.get(id) });
+  // AI가 이유를 쓴 항목을 먼저 보여준다. 같은 조건이면 기존 순서를 지킨다(정렬은 안정적이다).
+  const reasonFirst = <T extends { item: Item }>(recs: T[]): T[] =>
+    [...recs].sort((a, b) => Number(reasonOf.has(b.item.id)) - Number(reasonOf.has(a.item.id)));
   const widen = pickWiden(items, reading.fields, reading.values, constraints, today);
   return {
     mode,
     fields: reading.fields,
     values: reading.values,
-    within: result.within.slice(0, 3).map((r) => pick(r.item.id)),
-    withSupport: result.withSupport.slice(0, 2).map((r) => pick(r.item.id)),
+    within: reasonFirst(result.within).slice(0, 3).map((r) => pick(r.item.id)),
+    withSupport: reasonFirst(result.withSupport).slice(0, 2).map((r) => pick(r.item.id)),
     supports: result.supports.map((s) => s.id),
     widen: widen ? pick(widen.id) : undefined,
   };
