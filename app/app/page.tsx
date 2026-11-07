@@ -349,7 +349,7 @@ export default function Home() {
             {error && <p className={styles.error}>{error}</p>}
             <p className={styles.privacy}>
               쓴 글은 추천을 만들기 위해 AI(Anthropic의 Claude)에게 전달돼. 우리 서버에는 저장하지
-              않지만, AI 회사 쪽에는 정해진 기간 동안 남을 수 있어. 이름·학교·연락처처럼 나를 알아볼
+              않지만, AI 회사 쪽에는 보통 30일쯤 남을 수 있어. 이름·학교·연락처처럼 나를 알아볼
               수 있는 내용은 쓰지 마. 기록은 이 브라우저에만 남아.
             </p>
           </div>
