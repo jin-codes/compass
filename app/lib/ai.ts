@@ -2,7 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { FIELD_OPTIONS, VALUE_OPTIONS } from "./items";
 import type { Item } from "./types";
 
-const MODEL = process.env.COMPASS_MODEL ?? "claude-opus-5-5";
+// Jin 확정(2026-11-07): Opus와 같은 입력으로 비교해 품질이 비슷하고 약 2배 빨라서 Haiku.
+const MODEL = process.env.COMPASS_MODEL ?? "claude-haiku-5-5";
 
 const SCHEMA = {
   type: "object",
