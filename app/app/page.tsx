@@ -273,6 +273,14 @@ export default function Home() {
                   <h3>{s.name}</h3>
                   <p>{s.summary}</p>
                   {s.eligibility && <p className={styles.meta}>{s.eligibility}</p>}
+                  {s.sourceUrl && (
+                    <p className={styles.meta}>
+                      <a href={s.sourceUrl} target="_blank" rel="noreferrer">
+                        출처
+                      </a>
+                      {s.lastChecked ? ` · 마지막 확인 ${s.lastChecked}` : ""}
+                    </p>
+                  )}
                 </article>
               ))}
             </>

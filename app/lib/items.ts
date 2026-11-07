@@ -565,29 +565,29 @@ export const ITEMS: Item[] = [
     verified: true,
   },
 
-  // 아래는 e청소년 공식 페이지에서 읽은 외부 항목이다. Jin이 확인하기 전까지
-  // verified: false 라서 앱에 나오지 않는다. 근거와 미확인 사항은 ../data-candidates.md.
+  // 아래는 e청소년 공식 페이지에서 읽은 외부 항목이다. 근거와 미확인 사항은
+  // ../data-candidates.md. a-self-challenge-award는 주당 시간이 원문에 없어 아직 false다.
   {
     id: "a-intl-award",
     kind: "activity",
     name: "국제청소년성취포상제",
     summary:
-      "봉사·자기개발·신체단련·탐험 영역에서 스스로 목표를 세워 활동하고 기록한다. 포상센터 상담 후 홈페이지에서 입회 신청한다. 동장은 6개월 과정이다.",
+      "봉사·자기개발·신체단련·탐험 영역에서 스스로 목표를 세워 활동하고 기록한다. 포상센터 상담 후 홈페이지에서 입회 신청한다. 동장은 6개월 과정이고, 활동은 영역마다 주 1회 1시간 이상 해야 인정돼. 입회 시기와 자리는 포상센터에 물어봐야 해.",
     learns: "목표 세우기, 꾸준히 하고 기록하기, 여러 영역을 경험해보기",
     fields: ["사회·환경 문제", "사람·상담"],
     values: ["누군가를 돕는 일", "깊이 파고드는 탐구"],
     costKrw: 30000,
     costNote:
       "처음 동장 기준(가입비 2만원 + 참가비 1만원). 해당되면 입회비 면제 가능",
-    // 주당 시간은 원문에 없다. 봉사 영역만 동장 3개월 12시간 이상으로 적혀 있다. 확인 필요.
-    hoursPerWeek: 2,
+    // 주 1회 1시간 이상은 영역마다의 최소치다. 영역을 함께 하면 더 든다.
+    hoursPerWeek: 1,
     equipment: "phone",
-    eligibility: "만 14세 이상 만 24세 이하",
+    eligibility: "만 14세 이상 만 24세 이하. e청소년 회원가입(실명인증)이 필요해",
     cheaperAltId: "c-small-help",
     sourceUrl:
-      "https://www.youth.go.kr/youth/youth/contents/intrlSccesRwardIntroForm.yt?curMenuSn=342",
+      "https://www.youth.go.kr/youth/youth/contents/intrlSccesPartcptnMthForm.yt?curMenuSn=366",
     lastChecked: "2026-11-07",
-    verified: false,
+    verified: true,
   },
   {
     id: "a-self-challenge-award",
@@ -626,6 +626,6 @@ export const ITEMS: Item[] = [
     sourceUrl:
       "https://www.youth.go.kr/youth/youth/contents/intrlSccesPartcptnCtForm.yt?curMenuSn=368",
     lastChecked: "2026-11-07",
-    verified: false,
+    verified: true,
   },
 ];
