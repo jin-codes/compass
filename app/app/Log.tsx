@@ -13,15 +13,28 @@ import styles from "./page.module.css";
 export function RecordButton({
   itemId,
   title,
+  onOpenLog,
 }: {
   itemId: string;
   title: string;
+  onOpenLog?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
 
-  if (saved) return <p className={styles.meta}>기록했어. 아래 &ldquo;내 기록&rdquo;에 쌓여.</p>;
+  if (saved) {
+    return (
+      <div className={styles.formRow}>
+        <span className={styles.meta}>기록했어.</span>
+        {onOpenLog && (
+          <button type="button" className={styles.primary} onClick={onOpenLog}>
+            다음에 해볼 갈래 보기
+          </button>
+        )}
+      </div>
+    );
+  }
 
   if (!open) {
     return (
@@ -148,6 +161,21 @@ export function LogSection({
         보내지 않아. 브라우저 데이터를 지우면 함께 사라져.
       </p>
 
+      {entries.length > 0 ? (
+        <AdviceBlock entries={entries} interestedFields={interestedFields} />
+      ) : (
+        <p className={styles.empty}>
+          아직 기록이 없어. 찾기에서 도전을 하나 해보고 &ldquo;해봤어요&rdquo;를 눌러봐.
+          기록이 쌓이면 다음에 해볼 갈래를 알려줄게.
+        </p>
+      )}
+
+      <details className={styles.conditions}>
+        <summary>
+          <span>직접 한 일 적기</span>
+          <span>펼치기</span>
+        </summary>
+        <div className={styles.conditionBody}>
       <form
         className={styles.form}
         onSubmit={(e) => {
@@ -185,10 +213,11 @@ export function LogSection({
           </button>
         </div>
       </form>
+        </div>
+      </details>
 
       {entries.length > 0 && (
         <>
-          <AdviceBlock entries={entries} interestedFields={interestedFields} />
           <ul className={styles.log}>
             {entries.map((e) => (
               <li key={e.id} className={styles.card}>

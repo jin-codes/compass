@@ -1,15 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { FIELD_OPTIONS, ITEMS, VALUE_OPTIONS } from "@/lib/items";
-import { localToday } from "@/lib/date";
-import { recommend } from "@/lib/recommend";
-import type {
-  Budget,
-  Equipment,
-  Item,
-  Recommendation,
-} from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import { ITEMS } from "@/lib/items";
+import { useEntries } from "@/lib/log";
+import type { Pick, Suggestion } from "@/lib/suggest";
+import type { Budget, Equipment, Item } from "@/lib/types";
 import { LogSection, RecordButton } from "./Log";
 import styles from "./page.module.css";
 
@@ -19,53 +14,62 @@ const BUDGETS: { value: Budget; label: string }[] = [
   { value: 100000, label: "10만원 이하" },
   { value: -1, label: "제한 없음" },
 ];
-
 const HOURS = [1, 2, 4, 6];
-
 const EQUIPMENTS: { value: Equipment; label: string }[] = [
   { value: "phone", label: "스마트폰만" },
   { value: "laptop", label: "노트북이나 PC" },
   { value: "special", label: "별도 장비도 가능" },
 ];
+const EXAMPLES = [
+  "데이터로 뭔가 알아내는 게 재밌어",
+  "친구 고민 들어주는 편이야",
+  "직접 만들어서 올려보고 싶어",
+  "그림이나 사진 찍는 걸 좋아해",
+];
 
-function toggle(list: string[], v: string) {
-  return list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
-}
+const itemById = (id: string): Item | undefined => ITEMS.find((i) => i.id === id);
 
 function costLabel(item: Item) {
-  if (item.costKrw === 0) return "무료";
-  return `약 ${item.costKrw.toLocaleString("ko-KR")}원`;
+  return item.costKrw === 0 ? "무료" : `약 ${item.costKrw.toLocaleString("ko-KR")}원`;
 }
 
-function Card({ rec, support }: { rec: Recommendation; support?: boolean }) {
-  const { item, matchedFields, matchedValues, cheaperAlt } = rec;
+function Card({
+  pick,
+  hero,
+  onOpenLog,
+}: {
+  pick: Pick;
+  hero?: boolean;
+  onOpenLog: () => void;
+}) {
+  const item = itemById(pick.id);
+  if (!item) return null;
+  const cheaper = item.cheaperAltId ? itemById(item.cheaperAltId) : undefined;
   return (
-    <article className={styles.card}>
+    <article className={`${styles.card} ${hero ? styles.cardHero : ""}`}>
       <div className={styles.cardHead}>
         <h3>{item.name}</h3>
         {item.sample && <span className={styles.badge}>샘플</span>}
       </div>
+      {pick.reason && <p className={styles.reason}>{pick.reason}</p>}
       <p>{item.summary}</p>
       <p className={styles.learns}>
         <b>배울 수 있는 것</b> {item.learns}
       </p>
       <p className={styles.meta}>
         {costLabel(item)} · 주 {item.hoursPerWeek}시간쯤
+        {item.equipment === "laptop" ? " · 노트북이나 PC 필요" : ""}
+        {item.equipment === "special" ? " · 별도 장비 필요" : ""}
         {item.costNote ? ` · ${item.costNote}` : ""}
+        {item.eligibility ? ` · ${item.eligibility}` : ""}
       </p>
-      {(matchedFields.length > 0 || matchedValues.length > 0) && (
-        <p className={styles.why}>
-          이어지는 지점: {[...matchedFields, ...matchedValues].join(", ")}
-        </p>
-      )}
-      {support && cheaperAlt && (
+      {cheaper && (
         <p className={styles.alt}>
-          같은 걸 배울 수 있는 다른 길: <b>{cheaperAlt.name}</b> (
-          {costLabel(cheaperAlt)})
+          같은 걸 배울 수 있는 다른 길: <b>{cheaper.name}</b> ({costLabel(cheaper)})
         </p>
       )}
       {item.kind === "challenge" && (
-        <RecordButton itemId={item.id} title={item.name} />
+        <RecordButton itemId={item.id} title={item.name} onOpenLog={onOpenLog} />
       )}
       {item.sourceUrl && (
         <p className={styles.meta}>
@@ -79,216 +83,254 @@ function Card({ rec, support }: { rec: Recommendation; support?: boolean }) {
   );
 }
 
+function Results({ s, onOpenLog }: { s: Suggestion; onOpenLog: () => void }) {
+  const [first, ...rest] = s.within;
+  const read = [...s.fields, ...s.values];
+  const nothing = !first && s.withSupport.length === 0;
+  return (
+    <section className={styles.results} aria-live="polite">
+      <div className={styles.read}>
+        {read.length > 0 ? (
+          <>
+            <span>이렇게 읽었어. 아니면 위 글을 고쳐서 다시 찾아봐.</span>
+            <div className={styles.tags}>
+              {read.map((t) => (
+                <span key={t}>{t}</span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <span>
+            아직 끌리는 쪽을 못 읽었어. 무엇을 해봤는지, 어떤 때 시간 가는 줄 몰랐는지
+            한두 문장만 더 써줘.
+          </span>
+        )}
+        {s.mode === "basic" && (
+          <span className={styles.meta}>지금은 AI 없이 단어로만 읽었어. 정확하지 않을 수 있어.</span>
+        )}
+      </div>
+
+      {nothing && read.length > 0 && (
+        <p className={styles.empty}>
+          이 조건에 맞는 시도가 아직 목록에 없어. 말이나 조건을 바꿔서 다시 찾아봐.
+        </p>
+      )}
+
+      {first && (
+        <>
+          <h2>이번 주 하나</h2>
+          <Card pick={first} hero onOpenLog={onOpenLog} />
+        </>
+      )}
+
+      {rest.length > 0 && (
+        <>
+          <h2>다른 선택지</h2>
+          {rest.map((p) => (
+            <Card key={p.id} pick={p} onOpenLog={onOpenLog} />
+          ))}
+        </>
+      )}
+
+      {s.widen && (
+        <>
+          <h2>전혀 다른 쪽도 하나</h2>
+          <p className={styles.meta}>
+            방금 말한 것과 겹치지 않는 쪽이야. 끌리는지 확인하는 데 써. 정답이 아니야.
+          </p>
+          <Card pick={s.widen} onOpenLog={onOpenLog} />
+        </>
+      )}
+
+      {s.withSupport.length > 0 && (
+        <>
+          <h2>조건을 조금 넘지만 함께 볼 만한 것</h2>
+          <p className={styles.meta}>
+            예산이나 장비가 지금 조건을 넘어. 더 가벼운 길이 있으면 함께 적어뒀어.
+            {s.supports.length > 0 ? " 비용이 걸리면 아래 지원 안내를 봐." : ""}
+          </p>
+          {s.withSupport.map((p) => (
+            <Card key={p.id} pick={p} onOpenLog={onOpenLog} />
+          ))}
+        </>
+      )}
+
+      {s.supports.length > 0 && (
+        <>
+          <h2>지원 안내</h2>
+          {s.supports.map((id) => {
+            const x = itemById(id);
+            if (!x) return null;
+            return (
+              <article key={x.id} className={styles.card}>
+                <h3>{x.name}</h3>
+                <p>{x.summary}</p>
+                {x.eligibility && <p className={styles.meta}>{x.eligibility}</p>}
+                {x.sourceUrl && (
+                  <p className={styles.meta}>
+                    <a href={x.sourceUrl} target="_blank" rel="noreferrer">
+                      출처
+                    </a>
+                    {x.lastChecked ? ` · 마지막 확인 ${x.lastChecked}` : ""}
+                  </p>
+                )}
+              </article>
+            );
+          })}
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function Home() {
-  const [fields, setFields] = useState<string[]>([]);
-  const [values, setValues] = useState<string[]>([]);
-  const [budget, setBudget] = useState<Budget | null>(null);
-  const [hours, setHours] = useState<number | null>(null);
-  const [equipment, setEquipment] = useState<Equipment | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-  const resultsRef = useRef<HTMLElement>(null);
+  const entries = useEntries();
+  const [tab, setTab] = useState<"find" | "log">("find");
+  const [text, setText] = useState("");
+  const [budget, setBudget] = useState<Budget>(0);
+  const [hours, setHours] = useState(2);
+  const [equipment, setEquipment] = useState<Equipment>("phone");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<Suggestion | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (submitted) {
-      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (result) resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [result]);
+
+  const ready = text.trim().length >= 2 && !loading;
+  const budgetLabel = BUDGETS.find((b) => b.value === budget)?.label;
+  const equipmentLabel = EQUIPMENTS.find((e) => e.value === equipment)?.label;
+
+  async function find() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/suggest", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: text.trim(), budget, hours, equipment }),
+      });
+      if (res.status === 429) {
+        setError("잠깐 너무 많이 눌렀어. 1분쯤 뒤에 다시 해봐.");
+        return;
+      }
+      if (!res.ok) throw new Error(String(res.status));
+      setResult((await res.json()) as Suggestion);
+    } catch {
+      setError("지금은 못 찾았어. 잠시 뒤에 다시 눌러봐.");
+    } finally {
+      setLoading(false);
     }
-  }, [submitted]);
+  }
 
-  const ready =
-    fields.length + values.length > 0 &&
-    budget !== null &&
-    hours !== null &&
-    equipment !== null;
-
-  const result = useMemo(() => {
-    if (!submitted || budget === null || hours === null || equipment === null) {
-      return null;
-    }
-    const today = localToday();
-    return recommend(
-      ITEMS,
-      { fields, values, constraints: { budget, hoursPerWeek: hours, equipment } },
-      today
-    );
-  }, [submitted, fields, values, budget, hours, equipment]);
-
-  const empty =
-    result && result.within.length === 0 && result.withSupport.length === 0;
+  const chips = <T extends string | number>(
+    options: { value: T; label: string }[],
+    current: T,
+    set: (v: T) => void
+  ) => (
+    <div className={styles.chips}>
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          type="button"
+          aria-pressed={current === o.value}
+          className={current === o.value ? styles.on : ""}
+          onClick={() => set(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <main className={styles.main}>
-      <header>
-        <h1>Compass Rose</h1>
-        <p className={styles.lead}>
-          직업 하나를 찍어주지 않아. 끌리는 것과 중요하게 여기는 것을 고르면,
-          이번 주에 해볼 수 있는 시도를 보여줄게. 무엇을 할지는 네가 정해.
-        </p>
-      </header>
+      <div className={styles.bar}>
+        <span className={styles.brand}>Compass Rose</span>
+        <nav className={styles.tabs} aria-label="화면">
+          <button type="button" aria-pressed={tab === "find"} onClick={() => setTab("find")}>
+            찾기
+          </button>
+          <button type="button" aria-pressed={tab === "log"} onClick={() => setTab("log")}>
+            내 기록{entries.length > 0 ? ` ${entries.length}` : ""}
+          </button>
+        </nav>
+      </div>
 
-      <section className={styles.block}>
-        <h2>끌리는 분야</h2>
-        <div className={styles.chips}>
-          {FIELD_OPTIONS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={fields.includes(f)}
-              className={fields.includes(f) ? styles.on : ""}
-              onClick={() => setFields(toggle(fields, f))}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.block}>
-        <h2>일할 때 중요한 것</h2>
-        <div className={styles.chips}>
-          {VALUE_OPTIONS.map((v) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={values.includes(v)}
-              className={values.includes(v) ? styles.on : ""}
-              onClick={() => setValues(toggle(values, v))}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.block}>
-        <h2>지금 내 조건</h2>
-        <div className={styles.row}>
-          <span>예산</span>
-          <div className={styles.chips}>
-            {BUDGETS.map((b) => (
-              <button
-                key={b.value}
-                type="button"
-                aria-pressed={budget === b.value}
-                className={budget === b.value ? styles.on : ""}
-                onClick={() => setBudget(b.value)}
-              >
-                {b.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className={styles.row}>
-          <span>일주일에 쓸 수 있는 시간</span>
-          <div className={styles.chips}>
-            {HOURS.map((h) => (
-              <button
-                key={h}
-                type="button"
-                aria-pressed={hours === h}
-                className={hours === h ? styles.on : ""}
-                onClick={() => setHours(h)}
-              >
-                {h}시간
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className={styles.row}>
-          <span>쓸 수 있는 장비</span>
-          <div className={styles.chips}>
-            {EQUIPMENTS.map((e) => (
-              <button
-                key={e.value}
-                type="button"
-                aria-pressed={equipment === e.value}
-                className={equipment === e.value ? styles.on : ""}
-                onClick={() => setEquipment(e.value)}
-              >
-                {e.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <button
-        type="button"
-        className={styles.go}
-        disabled={!ready}
-        onClick={() => setSubmitted(true)}
-      >
-        해볼 거리 보기
-      </button>
-      {!ready && (
-        <p className={styles.meta}>
-          분야나 중요한 것을 하나 이상 고르고, 예산·시간·장비를 모두 골라줘.
-        </p>
-      )}
-
-      {result && (
-        <section
-          ref={resultsRef}
-          className={styles.results}
-          aria-live="polite"
-        >
-          {empty && (
-            <p>
-              고른 조건에 맞는 시도가 아직 목록에 없어. 분야나 조건을 바꿔서 다시
-              골라봐.
+      {tab === "find" && (
+        <>
+          <header className={styles.hero}>
+            <h1>요즘 뭐가 끌려?</h1>
+            <p className={styles.lead}>
+              해본 것, 궁금한 것, 시간 가는 줄 몰랐던 순간을 편하게 써줘. 직업을 정해주지 않고,
+              이번 주에 해볼 거리를 보여줄게.
             </p>
-          )}
+          </header>
 
-          {result.within.length > 0 && (
-            <>
-              <h2>지금 바로 해볼 수 있는 것</h2>
-              {result.within.map((r) => (
-                <Card key={r.item.id} rec={r} />
+          <div className={styles.ask}>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={500}
+              placeholder="예: 학교 동아리에서 데이터를 정리했는데 생각보다 재밌었어. 근데 이게 진로랑 이어지는지는 모르겠어."
+              aria-label="요즘 끌리는 것"
+            />
+            <div className={styles.examples}>
+              {EXAMPLES.map((ex) => (
+                <button key={ex} type="button" onClick={() => setText(ex)}>
+                  {ex}
+                </button>
               ))}
-            </>
-          )}
+            </div>
 
-          {result.withSupport.length > 0 && (
-            <>
-              <h2>
-                {result.supports.length > 0
-                  ? "지원받으면 가능한 길"
-                  : "지금 조건을 넘지만 함께 볼 만한 것"}
-              </h2>
-              <p className={styles.meta}>
-                {result.supports.length > 0
-                  ? "지금 조건을 넘지만 같은 분야를 더 깊이 볼 수 있어. 아래 지원 안내와 함께 봐."
-                  : "예산이나 장비가 지금 조건을 넘어. 더 가벼운 길이 있으면 함께 적어뒀어."}
-              </p>
-              {result.withSupport.map((r) => (
-                <Card key={r.item.id} rec={r} support />
-              ))}
-            </>
-          )}
-
-          {result.supports.length > 0 && (
-            <>
-              <h2>지원 안내</h2>
-              {result.supports.map((s) => (
-                <article key={s.id} className={styles.card}>
-                  <h3>{s.name}</h3>
-                  <p>{s.summary}</p>
-                  {s.eligibility && <p className={styles.meta}>{s.eligibility}</p>}
-                  {s.sourceUrl && (
-                    <p className={styles.meta}>
-                      <a href={s.sourceUrl} target="_blank" rel="noreferrer">
-                        출처
-                      </a>
-                      {s.lastChecked ? ` · 마지막 확인 ${s.lastChecked}` : ""}
-                    </p>
+            <details className={styles.conditions}>
+              <summary>
+                <span>
+                  <b>{budgetLabel}</b> · 주 <b>{hours}시간</b> · <b>{equipmentLabel}</b>
+                </span>
+                <span>바꾸기</span>
+              </summary>
+              <div className={styles.conditionBody}>
+                <div className={styles.row}>
+                  <span>예산</span>
+                  {chips(BUDGETS, budget, setBudget)}
+                </div>
+                <div className={styles.row}>
+                  <span>일주일에 쓸 수 있는 시간</span>
+                  {chips(
+                    HOURS.map((h) => ({ value: h, label: `${h}시간` })),
+                    hours,
+                    setHours
                   )}
-                </article>
-              ))}
-            </>
+                </div>
+                <div className={styles.row}>
+                  <span>쓸 수 있는 장비</span>
+                  {chips(EQUIPMENTS, equipment, setEquipment)}
+                </div>
+              </div>
+            </details>
+
+            <button type="button" className={styles.go} disabled={!ready} onClick={find}>
+              {loading ? "읽는 중이야…" : "해볼 거리 찾기"}
+            </button>
+            {error && <p className={styles.error}>{error}</p>}
+            <p className={styles.privacy}>
+              쓴 글은 추천을 만드는 동안에만 쓰고 저장하지 않아. 기록은 이 브라우저에만 남아.
+              개인정보(이름, 학교, 연락처)는 쓰지 않아도 돼.
+            </p>
+          </div>
+
+          {result && (
+            <div ref={resultsRef} className={styles.results}>
+              <Results s={result} onOpenLog={() => setTab("log")} />
+            </div>
           )}
-        </section>
+        </>
       )}
 
-      <LogSection interestedFields={fields} />
+      {tab === "log" && <LogSection interestedFields={result?.fields ?? []} />}
 
       <footer className={styles.foot}>
         추천은 확인된 목록 안에서만 해. 정보는 마지막 확인일 기준이야.
