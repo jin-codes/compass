@@ -83,6 +83,37 @@ function Card({
   );
 }
 
+const LOADING_STEPS = [
+  "네가 쓴 글을 읽는 중이야",
+  "해볼 만한 것을 목록에서 찾는 중이야",
+  "왜 어울리는지 적는 중이야",
+  "거의 다 됐어",
+];
+
+/** 응답을 기다리는 동안 보여주는 자리. 단계 문구는 처리 순서를 말할 뿐 실제 진행률이 아니다. */
+function Loading({ text }: { text: string }) {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setStep((s) => Math.min(s + 1, LOADING_STEPS.length - 1)), 1800);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <section className={styles.results} role="status" aria-live="polite" aria-busy="true">
+      <div className={styles.read}>
+        <span className={styles.meta}>네가 쓴 말</span>
+        <span className={styles.echo}>{text}</span>
+        <span>{LOADING_STEPS[step]}…</span>
+      </div>
+      <div className={styles.skeleton} aria-hidden="true">
+        <span style={{ width: "62%" }} />
+        <span style={{ width: "100%" }} />
+        <span style={{ width: "88%" }} />
+        <span style={{ width: "40%" }} />
+      </div>
+    </section>
+  );
+}
+
 function Results({ s, onOpenLog }: { s: Suggestion; onOpenLog: () => void }) {
   const [first, ...rest] = s.within;
   const read = [...s.fields, ...s.values];
@@ -196,8 +227,8 @@ export default function Home() {
   const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (result) resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [result]);
+    if (result || loading) resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [result, loading]);
 
   const ready = text.trim().length >= 2 && !loading;
   const budgetLabel = BUDGETS.find((b) => b.value === budget)?.label;
@@ -313,7 +344,7 @@ export default function Home() {
             </details>
 
             <button type="button" className={styles.go} disabled={!ready} onClick={find}>
-              {loading ? "읽는 중이야…" : "해볼 거리 찾기"}
+              {loading ? "찾는 중…" : "해볼 거리 찾기"}
             </button>
             {error && <p className={styles.error}>{error}</p>}
             <p className={styles.privacy}>
@@ -322,9 +353,13 @@ export default function Home() {
             </p>
           </div>
 
-          {result && (
+          {(loading || result) && (
             <div ref={resultsRef} className={styles.results}>
-              <Results s={result} onOpenLog={() => setTab("log")} />
+              {loading ? (
+                <Loading text={text.trim()} />
+              ) : (
+                result && <Results s={result} onOpenLog={() => setTab("log")} />
+              )}
             </div>
           )}
         </>
