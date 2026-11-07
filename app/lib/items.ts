@@ -564,4 +564,68 @@ export const ITEMS: Item[] = [
     equipment: "phone",
     verified: true,
   },
+
+  // 아래는 e청소년 공식 페이지에서 읽은 외부 항목이다. Jin이 확인하기 전까지
+  // verified: false 라서 앱에 나오지 않는다. 근거와 미확인 사항은 ../data-candidates.md.
+  {
+    id: "a-intl-award",
+    kind: "activity",
+    name: "국제청소년성취포상제",
+    summary:
+      "봉사·자기개발·신체단련·탐험 영역에서 스스로 목표를 세워 활동하고 기록한다. 포상센터 상담 후 홈페이지에서 입회 신청한다. 동장은 6개월 과정이다.",
+    learns: "목표 세우기, 꾸준히 하고 기록하기, 여러 영역을 경험해보기",
+    fields: ["사회·환경 문제", "사람·상담"],
+    values: ["누군가를 돕는 일", "깊이 파고드는 탐구"],
+    costKrw: 30000,
+    costNote:
+      "처음 동장 기준(가입비 2만원 + 참가비 1만원). 해당되면 입회비 면제 가능",
+    // 주당 시간은 원문에 없다. 봉사 영역만 동장 3개월 12시간 이상으로 적혀 있다. 확인 필요.
+    hoursPerWeek: 2,
+    equipment: "phone",
+    eligibility: "만 14세 이상 만 24세 이하",
+    cheaperAltId: "c-small-help",
+    sourceUrl:
+      "https://www.youth.go.kr/youth/youth/contents/intrlSccesRwardIntroForm.yt?curMenuSn=342",
+    lastChecked: "2026-11-07",
+    verified: false,
+  },
+  {
+    id: "a-self-challenge-award",
+    kind: "activity",
+    name: "청소년자기도전포상제",
+    summary:
+      "봉사·자기개발·신체단련·탐험·진로개발 중 4개 영역을 골라 스스로 정한 목표를 이룬다. 동장은 16주 과정이다.",
+    learns: "스스로 계획하고 실천하기, 진로개발 활동 경험하기",
+    fields: ["사회·환경 문제", "사람·상담"],
+    values: ["깊이 파고드는 탐구", "누군가를 돕는 일"],
+    costKrw: 30000,
+    costNote: "입회비, 단계 동일. 해당되면 면제 가능",
+    // 주당 시간은 원문에 없다. 확인 필요.
+    hoursPerWeek: 2,
+    equipment: "phone",
+    eligibility: "만 7세 이상 만 15세 이하 (초1~중3)",
+    cheaperAltId: "c-small-help",
+    sourceUrl:
+      "https://www.youth.go.kr/youth/youth/contents/selfChlngRwardIntroForm.yt?curMenuSn=362",
+    lastChecked: "2026-11-07",
+    verified: false,
+  },
+  {
+    id: "s-award-fee-waiver",
+    kind: "support",
+    name: "포상제 입회비 면제",
+    summary:
+      "기초생활수급, 저소득 한부모, 다문화, 장애, 북한이탈, 법적 차상위, 농어촌·도서산간벽지, 또는 기관장·학교장 추천에 해당하면 증빙을 첨부해 입회비를 면제받을 수 있다. 해당되는지는 포상센터에 물어보면 된다.",
+    learns: "비용 때문에 막히지 않는 길 알아두기",
+    fields: [],
+    values: [],
+    costKrw: 0,
+    hoursPerWeek: 0,
+    equipment: "phone",
+    eligibility: "위 조건 중 하나와 증빙 서류가 필요하다",
+    sourceUrl:
+      "https://www.youth.go.kr/youth/youth/contents/intrlSccesPartcptnCtForm.yt?curMenuSn=368",
+    lastChecked: "2026-11-07",
+    verified: false,
+  },
 ];
