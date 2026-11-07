@@ -132,7 +132,7 @@ function Results({ s, onOpenLog }: { s: Suggestion; onOpenLog: () => void }) {
         </>
       )}
 
-      {s.widen && (
+      {s.widen && read.length > 0 && (
         <>
           <h2>전혀 다른 쪽도 하나</h2>
           <p className={styles.meta}>
