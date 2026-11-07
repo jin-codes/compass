@@ -280,7 +280,7 @@ export default function Home() {
         </section>
       )}
 
-      <LogSection />
+      <LogSection interestedFields={fields} />
 
       <footer className={styles.foot}>
         추천은 확인된 목록 안에서만 해. 정보는 마지막 확인일 기준이야.

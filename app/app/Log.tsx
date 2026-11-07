@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { advise } from "@/lib/advice";
+import { localToday } from "@/lib/date";
+import { ITEMS } from "@/lib/items";
 import { addEntry, removeEntry, toText, useEntries } from "@/lib/log";
+import type { Entry } from "@/lib/log";
+import type { Item } from "@/lib/types";
 import styles from "./page.module.css";
 
 /** 도전 카드 안에서 쓰는 한 줄 회고 입력 */
@@ -58,7 +63,68 @@ export function RecordButton({
 }
 
 /** 지금까지 해온 것을 쌓아 보여주는 곳. 계정 없이 이 브라우저에만 저장한다. */
-export function LogSection() {
+function Suggest({ title, items }: { title: string; items: Item[] }) {
+  if (items.length === 0) return null;
+  return (
+    <>
+      <h3>{title}</h3>
+      <ul className={styles.log}>
+        {items.map((i) => (
+          <li key={i.id} className={styles.card}>
+            <b>{i.name}</b>
+            <p>{i.summary}</p>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/** 기록을 읽고 다음 시도를 제안한다. 평가나 순위가 아니고, 고르는 건 학생이다. */
+function AdviceBlock({
+  entries,
+  interestedFields,
+}: {
+  entries: Entry[];
+  interestedFields: string[];
+}) {
+  const advice = advise(entries, ITEMS, interestedFields, localToday());
+  if (!advice) return null;
+  const { doneCount, topFields, topValues, untouchedInterests, deeper, broader } =
+    advice;
+  return (
+    <div className={styles.block}>
+      <h3>기록을 보니</h3>
+      <p>
+        도전 {doneCount}개를 해봤어. 가장 자주 닿은 분야는{" "}
+        <b>{topFields.join(", ")}</b>
+        {topValues.length > 0 && (
+          <>
+            , 자주 나온 가치는 <b>{topValues.join(", ")}</b>
+          </>
+        )}
+        이야.
+      </p>
+      {untouchedInterests.length > 0 && (
+        <p className={styles.meta}>
+          끌린다고 고른 분야 중 {untouchedInterests.join(", ")}은 아직 해본
+          기록이 없어. 말한 것과 해본 것이 다른지 살펴볼 만해.
+        </p>
+      )}
+      <p className={styles.meta}>
+        어느 쪽이 맞는지는 해본 네가 가장 잘 알아. 아래는 선택지일 뿐이야.
+      </p>
+      <Suggest title="같은 분야를 더 깊이" items={deeper} />
+      <Suggest title="아직 안 가본 분야로 넓히기" items={broader} />
+    </div>
+  );
+}
+
+export function LogSection({
+  interestedFields = [],
+}: {
+  interestedFields?: string[];
+}) {
   const entries = useEntries();
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
@@ -122,6 +188,7 @@ export function LogSection() {
 
       {entries.length > 0 && (
         <>
+          <AdviceBlock entries={entries} interestedFields={interestedFields} />
           <ul className={styles.log}>
             {entries.map((e) => (
               <li key={e.id} className={styles.card}>
