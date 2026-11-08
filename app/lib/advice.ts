@@ -16,6 +16,9 @@ export interface Advice {
   broader: Item[];
 }
 
+/** 깊이 1·2·3의 내부 가중치. 학생에게 보이지 않는다. 도전 하나는 3(직접 해봄)으로 센다. */
+export const DEPTH_WEIGHT = [1, 3, 6];
+
 function tally(lists: string[][]): Map<string, number> {
   const m = new Map<string, number>();
   for (const list of lists) for (const x of list) m.set(x, (m.get(x) ?? 0) + 1);
@@ -30,7 +33,7 @@ function top(m: Map<string, number>): string[] {
 
 /**
  * 기록(말한 나가 아니라 행동한 나)을 보고 다음 시도를 제안한다.
- * 도전과 이어지지 않은 직접 기록은 분야를 알 수 없어 세지 않는다.
+ * 도전과 이어지지 않은 직접 기록은 예시에서 골라 분야가 붙은 것만 센다.
  * 기록이 없으면 null. 점수·순위·연속 기록은 쓰지 않는다.
  */
 export function advise(
@@ -42,10 +45,19 @@ export function advise(
   const byId = new Map(items.map((i) => [i.id, i]));
   const doneIds = new Set<string>();
   for (const e of entries) if (e.itemId && byId.has(e.itemId)) doneIds.add(e.itemId);
-  if (doneIds.size === 0) return null;
+  // 예시에서 골라 적은 기록은 분야를 알 수 있으므로 깊이에 따라 가중해 함께 센다.
+  const tagged = entries.filter((e) => !e.itemId && e.field && e.depth);
+  if (doneIds.size === 0 && tagged.length === 0) return null;
 
   const done = [...doneIds].map((id) => byId.get(id)!);
-  const fieldCounts = tally(done.map((i) => i.fields));
+  const fieldCounts = new Map<string, number>();
+  for (const i of done)
+    for (const f of i.fields) fieldCounts.set(f, (fieldCounts.get(f) ?? 0) + 3);
+  for (const e of tagged)
+    fieldCounts.set(
+      e.field!,
+      (fieldCounts.get(e.field!) ?? 0) + DEPTH_WEIGHT[e.depth! - 1]
+    );
   const valueCounts = tally(done.map((i) => i.values));
   const topFields = top(fieldCounts);
   const topValues = top(valueCounts);

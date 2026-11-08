@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ITEMS } from "@/lib/items";
-import { useEntries } from "@/lib/log";
+import { refreshAccount, useEntries } from "@/lib/log";
 import type { Pick, Suggestion } from "@/lib/suggest";
 import type { Budget, Equipment, Item } from "@/lib/types";
 import { LogSection, RecordButton } from "./Log";
@@ -219,6 +219,9 @@ function Results({ s, onOpenLog }: { s: Suggestion; onOpenLog: () => void }) {
 }
 
 export default function Home() {
+  useEffect(() => {
+    void refreshAccount();
+  }, []);
   const entries = useEntries();
   const [tab, setTab] = useState<"find" | "log">("find");
   const [text, setText] = useState("");
@@ -354,7 +357,7 @@ export default function Home() {
             <p className={styles.privacy}>
               쓴 글은 추천을 만들기 위해 AI(Anthropic의 Claude)에게 전달돼. 우리 서버에는 저장하지
               않지만, AI 회사 쪽에는 보통 30일쯤 남을 수 있어. 이름·학교·연락처처럼 나를 알아볼
-              수 있는 내용은 쓰지 마. 기록은 이 브라우저에만 남아.
+              수 있는 내용은 쓰지 마. 기록은 네가 저장을 켜기 전에는 이 브라우저에만 남아.
             </p>
           </div>
 
