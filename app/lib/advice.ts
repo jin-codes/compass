@@ -10,10 +10,8 @@ export interface Advice {
   topValues: string[];
   /** 끌린다고 골랐지만 아직 해본 기록이 없는 분야 */
   untouchedInterests: string[];
-  /** 자주 닿은 분야를 더 깊게 */
-  deeper: Item[];
-  /** 아직 닿지 않은 분야로 넓히기 */
-  broader: Item[];
+  /** 해본 분야에 다른 분야를 엮는 도전(융합). 여러 분야에 걸친 항목만 담는다. */
+  blends: Item[];
 }
 
 /** 깊이 1·2·3의 내부 가중치. 학생에게 보이지 않는다. 도전 하나는 3(직접 해봄)으로 센다. */
@@ -67,31 +65,29 @@ export function advise(
     (i) => i.kind === "challenge" && !doneIds.has(i.id) && isPublishable(i, today)
   );
 
-  const deeper = open
-    .filter((i) => i.fields.some((f) => topFields.includes(f)))
+  // 융합: 해본 분야 하나 이상에 닿으면서 다른 분야와도 엮이는 도전을 먼저 고른다.
+  // 끌린다고 고른 분야와 겹치면 앞으로, 같은 값이면 싼 것부터.
+  const multi = open.filter((i) => i.fields.length >= 2);
+  const touched = (i: Item) => i.fields.filter((f) => fieldCounts.has(f)).length;
+  const fresh = (i: Item) => i.fields.length - touched(i);
+  const wanted = (i: Item) => i.fields.filter((f) => untouchedInterests.includes(f)).length;
+  const bridging = multi.filter((i) => touched(i) >= 1 && fresh(i) >= 1);
+  const pool = bridging.length > 0 ? bridging : multi.filter((i) => touched(i) >= 1);
+  const blends = (pool.length > 0 ? pool : multi)
     .sort(
       (a, b) =>
-        b.fields.filter((f) => topFields.includes(f)).length -
-          a.fields.filter((f) => topFields.includes(f)).length ||
+        wanted(b) - wanted(a) ||
+        touched(b) - touched(a) ||
+        fresh(b) - fresh(a) ||
         a.costKrw - b.costKrw
     )
-    .slice(0, 2);
-
-  // 넓히기: 해본 분야와 겹치지 않는 것. 끌린다고 고른 분야가 있으면 그쪽을 먼저.
-  const fresh = open.filter((i) => !i.fields.some((f) => fieldCounts.has(f)));
-  const byCost = (a: Item, b: Item) => a.costKrw - b.costKrw;
-  const wanted = fresh
-    .filter((i) => i.fields.some((f) => untouchedInterests.includes(f)))
-    .sort(byCost);
-  const rest = fresh.filter((i) => !wanted.includes(i)).sort(byCost);
-  const broader = [...wanted, ...rest].slice(0, 2);
+    .slice(0, 3);
 
   return {
     doneCount: done.length,
     topFields,
     topValues,
     untouchedInterests,
-    deeper,
-    broader,
+    blends,
   };
 }

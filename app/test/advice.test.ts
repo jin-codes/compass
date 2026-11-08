@@ -45,18 +45,28 @@ test("같은 도전을 여러 번 적어도 한 번으로 센다", () => {
   assert.equal(r.doneCount, 1);
 });
 
-test("자주 닿은 분야를 더 깊게: 이미 해본 도전은 제안하지 않는다", () => {
-  const r = advise([entry("a")], items, [], TODAY)!;
-  assert.deepEqual(r.topFields, ["데이터"]);
-  assert.ok(r.deeper.every((i) => i.id !== "a"));
-  assert.deepEqual(r.deeper.map((i) => i.id).sort(), ["b", "c"]);
+test("융합: 여러 분야에 걸친 것만, 이미 해본 도전은 제외", () => {
+  const r = advise([entry("c")], items, [], TODAY)!;
+  assert.ok(r.blends.every((i) => i.fields.length >= 2));
+  assert.ok(r.blends.every((i) => i.id !== "c"));
 });
 
-test("넓히기: 해본 분야와 겹치지 않는 것만, 끌린다고 고른 분야 먼저", () => {
-  const r = advise([entry("a")], items, ["사람"], TODAY)!;
-  assert.deepEqual(r.untouchedInterests, ["사람"]);
-  assert.equal(r.broader[0].id, "e");
-  assert.ok(r.broader.every((i) => !i.fields.includes("데이터")));
+test("융합: 해본 분야와 새 분야를 엮는 것을 먼저, 끌린다고 고른 분야가 겹치면 앞으로", () => {
+  const list = [
+    ch("dg", ["데이터", "글"]),
+    ch("dp", ["데이터", "사람"]),
+    ch("dd", ["데이터", "디자인"], { costKrw: 0 }),
+    ch("pg", ["사람", "글"]),
+  ];
+  const r = advise([entry("a")], [...items, ...list], ["사람"], TODAY)!;
+  assert.equal(r.blends[0].id, "dp");
+  assert.ok(r.blends.every((i) => i.fields.includes("데이터")));
+});
+
+test("융합: 해본 분야가 없는 도전뿐이면 여러 분야 도전을 싼 순서로 보여준다", () => {
+  const list = [ch("x", ["사람", "글"], { costKrw: 9000 }), ch("y", ["디자인", "글"])];
+  const r = advise([entry("a")], [ch("a", ["데이터"]), ...list], [], TODAY)!;
+  assert.deepEqual(r.blends.map((i) => i.id), ["y", "x"]);
 });
 
 test("고른 분야를 이미 해봤으면 '아직 안 해본 분야'로 말하지 않는다", () => {
@@ -67,5 +77,5 @@ test("고른 분야를 이미 해봤으면 '아직 안 해본 분야'로 말하�
 test("미검증 도전은 제안하지 않는다", () => {
   const list = [...items, ch("x", ["사람"], { verified: false })];
   const r = advise([entry("a")], list, [], TODAY)!;
-  assert.ok(r.broader.every((i) => i.id !== "x"));
+  assert.ok(r.blends.every((i) => i.id !== "x"));
 });

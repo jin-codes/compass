@@ -9,6 +9,7 @@ import { profile } from "@/lib/profile";
 import { ITEMS } from "@/lib/items";
 import {
   addEntry,
+  appendAnswer,
   createAccount,
   deleteAccount,
   localEntryCount,
@@ -22,18 +23,23 @@ import {
 import type { Entry } from "@/lib/log";
 import type { Item } from "@/lib/types";
 import type { Reflection } from "@/lib/reflect";
+import type { Analysis } from "@/lib/analyze";
+import { MIN_ENTRIES_FOR_ANALYSIS, MAX_ENTRIES_FOR_ANALYSIS } from "@/lib/analyze";
 import styles from "./page.module.css";
 
 
 const REFLECT_PRIVACY =
   "적은 내용은 반응을 만들기 위해 AI(Anthropic의 Claude)에게 전달돼. 우리 서버에는 저장하지 않지만, AI 회사 쪽에는 보통 30일쯤 남을 수 있어. 이름·학교·연락처처럼 나를 알아볼 수 있는 내용은 쓰지 마.";
 
-type ReflectState = { status: "idle" } | { status: "loading" } | { status: "done"; r: Reflection };
+type ReflectState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "done"; entryId: string; r: Reflection };
 
 /** 기록을 남긴 직후 짧은 반응을 받아온다. 실패하면 조용히 비운다(기록은 이미 저장됐다). */
 function useReflect(entries: Entry[]) {
   const [state, setState] = useState<ReflectState>({ status: "idle" });
-  async function ask(title: string, note: string) {
+  async function ask(entryId: string, title: string, note: string) {
     setState({ status: "loading" });
     try {
       const doneIds = entries.flatMap((e) => (e.itemId ? [e.itemId] : []));
@@ -43,7 +49,7 @@ function useReflect(entries: Entry[]) {
         body: JSON.stringify({ title, note, doneIds }),
       });
       if (!res.ok) throw new Error("fail");
-      setState({ status: "done", r: (await res.json()) as Reflection });
+      setState({ status: "done", entryId, r: (await res.json()) as Reflection });
     } catch {
       setState({ status: "idle" });
     }
@@ -53,6 +59,8 @@ function useReflect(entries: Entry[]) {
 
 /** 방금 한 일에 대한 반응. 평가가 아니라 가설이고, 다음에 뭘 할지는 학생이 고른다. */
 function ReflectCard({ state }: { state: ReflectState }) {
+  const [answer, setAnswer] = useState("");
+  const [answeredFor, setAnsweredFor] = useState<string | null>(null);
   if (state.status === "idle") return null;
   if (state.status === "loading") {
     return (
@@ -61,7 +69,8 @@ function ReflectCard({ state }: { state: ReflectState }) {
       </div>
     );
   }
-  const { noticed, next } = state.r;
+  const { noticed, next, question } = state.r;
+  const answered = answeredFor === state.entryId;
   const item = next ? ITEMS.find((i) => i.id === next.id) : undefined;
   return (
     <div className={styles.block} aria-live="polite">
@@ -76,7 +85,137 @@ function ReflectCard({ state }: { state: ReflectState }) {
           </div>
         </>
       )}
+      {question && (
+        <div className={styles.addForm}>
+          <p>
+            <b>{question}</b>
+          </p>
+          {answered ? (
+            <p className={styles.meta}>답을 이 기록에 붙여뒀어.</p>
+          ) : (
+            <>
+              <textarea
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder="떠오르는 대로 적어도 되고, 건너뛰어도 돼."
+                aria-label="질문에 대한 답"
+              />
+              <div className={styles.formRow}>
+                <button
+                  type="button"
+                  className={styles.ghost}
+                  disabled={!answer.trim()}
+                  onClick={() => {
+                    appendAnswer(state.entryId, question, answer);
+                    setAnsweredFor(state.entryId);
+                    setAnswer("");
+                  }}
+                >
+                  답 기록하기
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
       <p className={styles.meta}>맞는지는 해본 네가 가장 잘 알아. 참고만 해.</p>
+    </div>
+  );
+}
+
+type AnalysisState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error"; msg: string }
+  | { status: "done"; a: Analysis };
+
+/** 기록이 어느 정도 쌓였을 때 학생이 원해서 받는 종합 읽기. 저장하지 않고, 누를 때마다 새로 읽는다. */
+function AnalysisBlock({ entries }: { entries: Entry[] }) {
+  const [state, setState] = useState<AnalysisState>({ status: "idle" });
+  if (entries.length < MIN_ENTRIES_FOR_ANALYSIS) return null;
+
+  async function run() {
+    setState({ status: "loading" });
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: entries
+            .slice(0, MAX_ENTRIES_FOR_ANALYSIS)
+            .map(({ date, title, note }) => ({ date, title, note })),
+          doneIds: entries.flatMap((e) => (e.itemId ? [e.itemId] : [])),
+        }),
+      });
+      if (res.status === 429) {
+        setState({ status: "error", msg: "너무 자주 눌렀어. 잠깐 뒤에 다시 해줘." });
+        return;
+      }
+      if (!res.ok) {
+        setState({
+          status: "error",
+          msg: "지금은 종합 분석을 할 수 없어. 위의 '기록을 보니'와 '해본 일 돌아보기'는 볼 수 있어.",
+        });
+        return;
+      }
+      setState({ status: "done", a: (await res.json()) as Analysis });
+    } catch {
+      setState({ status: "error", msg: "연결이 안 됐어. 잠깐 뒤에 다시 해줘." });
+    }
+  }
+
+  const a = state.status === "done" ? state.a : null;
+  return (
+    <div className={styles.block}>
+      <h3>기록 종합해서 보기</h3>
+      <p className={styles.meta}>
+        지금까지 남긴 기록 {Math.min(entries.length, MAX_ENTRIES_FOR_ANALYSIS)}개를 AI가 한꺼번에
+        읽고, 반복해서 보이는 것과 아직 안 닿은 쪽을 짚어줘. 원할 때만 받아.
+      </p>
+      <div className={styles.formRow}>
+        <button
+          type="button"
+          className={styles.primary}
+          disabled={state.status === "loading"}
+          onClick={run}
+        >
+          {state.status === "loading" ? "읽는 중…" : a ? "다시 읽기" : "종합 분석 받기"}
+        </button>
+      </div>
+      <p className={styles.privacy}>{REFLECT_PRIVACY}</p>
+      {state.status === "error" && <p className={styles.error}>{state.msg}</p>}
+      {a && (
+        <div aria-live="polite">
+          <p>{a.pattern}</p>
+          {a.untouched && <p className={styles.meta}>{a.untouched}</p>}
+          {a.nexts.length > 0 && (
+            <>
+              <h3>다음에 해볼 만한 거리</h3>
+              <ul className={styles.log}>
+                {a.nexts.map((n) => {
+                  const item = ITEMS.find((i) => i.id === n.id);
+                  return item ? (
+                    <li key={n.id} className={styles.card}>
+                      <b>{item.name}</b>
+                      <p>{n.reason ?? item.summary}</p>
+                    </li>
+                  ) : null;
+                })}
+              </ul>
+            </>
+          )}
+          {a.question && (
+            <p>
+              <b>스스로 물어볼 만한 것:</b> {a.question}
+            </p>
+          )}
+          <p className={styles.meta}>
+            기록에서 읽은 가설이야. 맞는지는 해본 네가 가장 잘 알아.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -108,7 +247,7 @@ export function RecordButton({
             </button>
           )}
         </div>
-        <ReflectCard state={reflect.state} />
+        <ReflectCard key={reflect.state.status === "done" ? reflect.state.entryId : "x"} state={reflect.state} />
       </>
     );
   }
@@ -127,8 +266,8 @@ export function RecordButton({
       onSubmit={(e) => {
         e.preventDefault();
         if (!note.trim()) return;
-        addEntry({ itemId, title, note: note.trim() });
-        void reflect.ask(title, note.trim());
+        const id = addEntry({ itemId, title, note: note.trim() });
+        void reflect.ask(id, title, note.trim());
         setSaved(true);
       }}
     >
@@ -164,6 +303,7 @@ function Suggest({ title, items }: { title: string; items: Item[] }) {
         {items.map((i) => (
           <li key={i.id} className={styles.card}>
             <b>{i.name}</b>
+            <p className={styles.meta}>{i.fields.join(" + ")}</p>
             <p>{i.summary}</p>
           </li>
         ))}
@@ -182,7 +322,7 @@ function AdviceBlock({
 }) {
   const advice = advise(entries, ITEMS, interestedFields, localToday());
   if (!advice) return null;
-  const { doneCount, topFields, topValues, untouchedInterests, deeper, broader } =
+  const { doneCount, topFields, topValues, untouchedInterests, blends } =
     advice;
   return (
     <div className={styles.block}>
@@ -207,8 +347,7 @@ function AdviceBlock({
       <p className={styles.meta}>
         어느 쪽이 맞는지는 해본 네가 가장 잘 알아. 아래는 선택지일 뿐이야.
       </p>
-      <Suggest title="같은 분야를 더 깊이" items={deeper} />
-      <Suggest title="아직 안 가본 분야로 넓히기" items={broader} />
+      <Suggest title="해본 것에 다른 분야를 엮어보기" items={blends} />
     </div>
   );
 }
@@ -471,8 +610,7 @@ export function LogSection({
 
   function submit() {
     if (!title.trim()) return;
-    void reflect.ask(title.trim(), note.trim());
-    addEntry({
+    const id = addEntry({
       title: title.trim(),
       note: note.trim(),
       ...(picked && {
@@ -481,6 +619,7 @@ export function LogSection({
         dims: picked.ex.dims,
       }),
     });
+    void reflect.ask(id, title.trim(), note.trim());
     setPicked(null);
     setTitle("");
     setNote("");
@@ -512,6 +651,7 @@ export function LogSection({
         <>
           <AdviceBlock entries={entries} interestedFields={interestedFields} />
           <ProfileBlock entries={entries} />
+          <AnalysisBlock entries={entries} />
         </>
       ) : (
         <p className={styles.empty}>
@@ -623,7 +763,7 @@ export function LogSection({
         <p className={styles.privacy}>{REFLECT_PRIVACY}</p>
       </form>
 
-      <ReflectCard state={reflect.state} />
+      <ReflectCard key={reflect.state.status === "done" ? reflect.state.entryId : "x"} state={reflect.state} />
 
       {entries.length > 0 && (
         <>

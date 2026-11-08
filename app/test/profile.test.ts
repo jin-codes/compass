@@ -58,11 +58,11 @@ test("기간은 첫 기록과 마지막 기록 사이 일수", () => {
 
 test("advise: 예시 기록만 있어도 분야를 읽고, 모르는 분야는 무시하지 않는다", () => {
   const item: Item = {
-    id: "x", kind: "challenge", name: "x", summary: "", learns: "", fields: ["글·콘텐츠"],
+    id: "x", kind: "challenge", name: "x", summary: "", learns: "", fields: ["글·콘텐츠", "디자인·시각"],
     values: [], costKrw: 0, hoursPerWeek: 1, equipment: "phone", verified: true,
   };
   const r = advise([e("글·콘텐츠", 2, [])], [item], [], "2026-11-07")!;
   assert.deepEqual(r.topFields, ["글·콘텐츠"]);
   assert.equal(r.doneCount, 0);
-  assert.deepEqual(r.deeper.map((i) => i.id), ["x"]);
+  assert.deepEqual(r.blends.map((i) => i.id), ["x"]);
 });
