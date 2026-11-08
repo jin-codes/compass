@@ -69,6 +69,10 @@ export async function readWithAI(text: string, published: Item[]): Promise<unkno
       },
     ],
   });
+  // 비용 확인용. 토큰 수만 남기고 학생이 쓴 글은 남기지 않는다.
+  console.log(
+    `[usage] model=${MODEL} in=${response.usage.input_tokens} out=${response.usage.output_tokens}`
+  );
   if (response.stop_reason === "refusal") throw new Error("refusal");
   const block = response.content.find((b) => b.type === "text");
   if (!block || block.type !== "text") throw new Error("no_text");
