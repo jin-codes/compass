@@ -21,7 +21,65 @@ import {
 } from "@/lib/log";
 import type { Entry } from "@/lib/log";
 import type { Item } from "@/lib/types";
+import type { Reflection } from "@/lib/reflect";
 import styles from "./page.module.css";
+
+
+const REFLECT_PRIVACY =
+  "적은 내용은 반응을 만들기 위해 AI(Anthropic의 Claude)에게 전달돼. 우리 서버에는 저장하지 않지만, AI 회사 쪽에는 보통 30일쯤 남을 수 있어. 이름·학교·연락처처럼 나를 알아볼 수 있는 내용은 쓰지 마.";
+
+type ReflectState = { status: "idle" } | { status: "loading" } | { status: "done"; r: Reflection };
+
+/** 기록을 남긴 직후 짧은 반응을 받아온다. 실패하면 조용히 비운다(기록은 이미 저장됐다). */
+function useReflect(entries: Entry[]) {
+  const [state, setState] = useState<ReflectState>({ status: "idle" });
+  async function ask(title: string, note: string) {
+    setState({ status: "loading" });
+    try {
+      const doneIds = entries.flatMap((e) => (e.itemId ? [e.itemId] : []));
+      const res = await fetch("/api/reflect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, note, doneIds }),
+      });
+      if (!res.ok) throw new Error("fail");
+      setState({ status: "done", r: (await res.json()) as Reflection });
+    } catch {
+      setState({ status: "idle" });
+    }
+  }
+  return { state, ask };
+}
+
+/** 방금 한 일에 대한 반응. 평가가 아니라 가설이고, 다음에 뭘 할지는 학생이 고른다. */
+function ReflectCard({ state }: { state: ReflectState }) {
+  if (state.status === "idle") return null;
+  if (state.status === "loading") {
+    return (
+      <div className={styles.block} role="status" aria-live="polite">
+        <p className={styles.meta}>방금 한 일을 읽는 중…</p>
+      </div>
+    );
+  }
+  const { noticed, next } = state.r;
+  const item = next ? ITEMS.find((i) => i.id === next.id) : undefined;
+  return (
+    <div className={styles.block} aria-live="polite">
+      <h3>방금 한 일을 보니</h3>
+      <p>{noticed}</p>
+      {item && (
+        <>
+          <p className={styles.meta}>다음에 해볼 만한 거리 하나</p>
+          <div className={styles.card}>
+            <b>{item.name}</b>
+            <p>{next?.reason ?? item.summary}</p>
+          </div>
+        </>
+      )}
+      <p className={styles.meta}>맞는지는 해본 네가 가장 잘 알아. 참고만 해.</p>
+    </div>
+  );
+}
 
 /** 도전 카드 안에서 쓰는 한 줄 회고 입력 */
 export function RecordButton({
@@ -36,17 +94,22 @@ export function RecordButton({
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
+  const entries = useEntries();
+  const reflect = useReflect(entries);
 
   if (saved) {
     return (
-      <div className={styles.formRow}>
-        <span className={styles.meta}>기록했어.</span>
-        {onOpenLog && (
-          <button type="button" className={styles.primary} onClick={onOpenLog}>
-            다음에 해볼 갈래 보기
-          </button>
-        )}
-      </div>
+      <>
+        <div className={styles.formRow}>
+          <span className={styles.meta}>기록했어.</span>
+          {onOpenLog && (
+            <button type="button" className={styles.primary} onClick={onOpenLog}>
+              다음에 해볼 갈래 보기
+            </button>
+          )}
+        </div>
+        <ReflectCard state={reflect.state} />
+      </>
     );
   }
 
@@ -65,6 +128,7 @@ export function RecordButton({
         e.preventDefault();
         if (!note.trim()) return;
         addEntry({ itemId, title, note: note.trim() });
+        void reflect.ask(title, note.trim());
         setSaved(true);
       }}
     >
@@ -77,6 +141,7 @@ export function RecordButton({
           maxLength={500}
         />
       </label>
+      <p className={styles.privacy}>{REFLECT_PRIVACY}</p>
       <div className={styles.formRow}>
         <button type="submit" className={styles.ghost} disabled={!note.trim()}>
           기록 남기기
@@ -402,8 +467,11 @@ export function LogSection({
     ex: Example;
   } | null>(null);
 
+  const reflect = useReflect(entries);
+
   function submit() {
     if (!title.trim()) return;
+    void reflect.ask(title.trim(), note.trim());
     addEntry({
       title: title.trim(),
       note: note.trim(),
@@ -552,7 +620,10 @@ export function LogSection({
           </button>
           {justSaved && <span className={styles.meta}>기록했어. 아래에 쌓였어.</span>}
         </div>
+        <p className={styles.privacy}>{REFLECT_PRIVACY}</p>
       </form>
+
+      <ReflectCard state={reflect.state} />
 
       {entries.length > 0 && (
         <>
