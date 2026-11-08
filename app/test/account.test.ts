@@ -59,13 +59,13 @@ test("기록 검사: 모양이 틀리면 버리고, 길이와 경향 코드를 �
     id: "a",
     date: "2026-11-08",
     title: "t".repeat(200),
-    note: "n".repeat(900),
+    note: "n".repeat(1500),
     depth: 9,
     dims: ["T", "Q", 3, "E"],
     field: "글·콘텐츠",
   })!;
   assert.equal(e.title.length, 80);
-  assert.equal(e.note.length, 500);
+  assert.equal(e.note.length, 1200);
   assert.equal(e.depth, undefined);
   assert.deepEqual(e.dims, ["T", "E"]);
   assert.equal(checkEntries("x"), null);

@@ -51,3 +51,14 @@ test("기본 반응은 분야를 못 읽으면 다음 시도 없이 반응만 �
   assert.equal(r.next, undefined);
   assert.ok(r.noticed);
 });
+
+test("질문은 길이를 제한해 남기고, 없으면 붙이지 않는다", () => {
+  const q = sanitizeReflect({ noticed: "n", question: "어느 순간이 달랐어?", fields: [], next: { id: "", reason: "" } }, items, []);
+  assert.equal(q?.question, "어느 순간이 달랐어?");
+  const none = sanitizeReflect({ noticed: "n", question: " ", fields: [], next: { id: "", reason: "" } }, items, []);
+  assert.equal(none?.question, undefined);
+});
+
+test("기본 반응에도 질문이 붙는다", () => {
+  assert.ok(basicReflect("산책", "", items, []).question);
+});

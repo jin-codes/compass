@@ -19,7 +19,7 @@ export function checkEntry(x: unknown): Entry | null {
     id: o.id,
     date: o.date,
     title: o.title.trim().slice(0, 80),
-    note: o.note.trim().slice(0, 500),
+    note: o.note.trim().slice(0, 1200),
   };
   if (typeof o.itemId === "string" && ID.test(o.itemId)) e.itemId = o.itemId;
   if (typeof o.field === "string" && o.field.length <= 30) e.field = o.field;

@@ -67,7 +67,7 @@ export function useEntries(): Entry[] {
   return useSyncExternalStore(subscribe, getSnapshot, () => EMPTY);
 }
 
-export function addEntry(e: Omit<Entry, "id" | "date">) {
+export function addEntry(e: Omit<Entry, "id" | "date">): string {
   const entry: Entry = {
     ...e,
     id: crypto.randomUUID(),
@@ -75,6 +75,18 @@ export function addEntry(e: Omit<Entry, "id" | "date">) {
   };
   write([entry, ...getSnapshot()]);
   if (acct.signedIn) void push([entry]);
+  return entry.id;
+}
+
+/** AI가 한 질문과 학생의 답을 그 기록의 회고 글 뒤에 붙인다. 새 필드는 만들지 않는다. */
+export function appendAnswer(id: string, question: string, answer: string) {
+  const cur = getSnapshot();
+  const e = cur.find((x) => x.id === id);
+  if (!e || !answer.trim()) return;
+  const add = `Q. ${question.trim()}\nA. ${answer.trim()}`;
+  const updated: Entry = { ...e, note: (e.note ? `${e.note}\n\n${add}` : add).slice(0, 1200) };
+  write(cur.map((x) => (x.id === id ? updated : x)));
+  if (acct.signedIn) void push([updated]);
 }
 
 export function removeEntry(id: string) {
