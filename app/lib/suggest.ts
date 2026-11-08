@@ -24,6 +24,8 @@ export interface Suggestion {
   supports: string[];
   /** 말한 분야와 겹치지 않는 쪽의 도전 하나 */
   widen?: Pick;
+  /** AI를 쓸 수 있었지만 사용 한도 때문에 키워드로 읽었다 */
+  busy?: boolean;
 }
 
 const FIELD_WORDS: Record<string, string[]> = {

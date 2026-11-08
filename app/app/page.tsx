@@ -137,7 +137,11 @@ function Results({ s, onOpenLog }: { s: Suggestion; onOpenLog: () => void }) {
           </span>
         )}
         {s.mode === "basic" && (
-          <span className={styles.meta}>지금은 AI 없이 단어로만 읽었어. 정확하지 않을 수 있어.</span>
+          <span className={styles.meta}>
+            {s.busy
+              ? "지금 AI를 쓰는 사람이 많아서 이번에는 단어로만 읽었어. 조금 있다 다시 해보면 더 잘 읽어."
+              : "지금은 AI 없이 단어로만 읽었어. 정확하지 않을 수 있어."}
+          </span>
         )}
       </div>
 
