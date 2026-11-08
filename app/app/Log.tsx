@@ -134,9 +134,12 @@ type AnalysisState =
 /** 기록이 어느 정도 쌓였을 때 학생이 원해서 받는 종합 읽기. 저장하지 않고, 누를 때마다 새로 읽는다. */
 function AnalysisBlock({ entries }: { entries: Entry[] }) {
   const [state, setState] = useState<AnalysisState>({ status: "idle" });
+  const [answer, setAnswer] = useState("");
+  const [answeredQ, setAnsweredQ] = useState<string | null>(null);
   if (entries.length < MIN_ENTRIES_FOR_ANALYSIS) return null;
 
   async function run() {
+    setAnswer("");
     setState({ status: "loading" });
     try {
       const res = await fetch("/api/analyze", {
@@ -207,9 +210,43 @@ function AnalysisBlock({ entries }: { entries: Entry[] }) {
             </>
           )}
           {a.question && (
-            <p>
-              <b>스스로 물어볼 만한 것:</b> {a.question}
-            </p>
+            <div className={styles.addForm}>
+              <p>
+                <b>스스로 물어볼 만한 것:</b> {a.question}
+              </p>
+              {answeredQ === a.question ? (
+                <p className={styles.meta}>질문과 답을 기록에 남겼어.</p>
+              ) : (
+                <>
+                  <textarea
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    placeholder="한두 문장이면 돼. 건너뛰어도 돼."
+                    aria-label="질문에 대한 답"
+                  />
+                  <div className={styles.formRow}>
+                    <button
+                      type="button"
+                      className={styles.ghost}
+                      disabled={!answer.trim()}
+                      onClick={() => {
+                        const q = a.question!;
+                        addEntry({
+                          title: "스스로 물어본 것",
+                          note: `Q. ${q}\nA. ${answer.trim()}`,
+                        });
+                        setAnsweredQ(q);
+                        setAnswer("");
+                      }}
+                    >
+                      답 기록하기
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
           <p className={styles.meta}>
             기록에서 읽은 가설이야. 맞는지는 해본 네가 가장 잘 알아.
