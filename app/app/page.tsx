@@ -248,7 +248,12 @@ export default function Home() {
       const res = await fetch("/api/suggest", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: text.trim(), budget, hours, equipment }),
+        body: JSON.stringify({
+          text: text.trim(),
+          budget,
+          hours,
+          equipment,
+        }),
       });
       if (res.status === 429) {
         setError("잠깐 너무 많이 눌렀어. 1분쯤 뒤에 다시 해봐.");
@@ -298,7 +303,8 @@ export default function Home() {
       </div>
 
       {tab === "find" && (
-        <>
+        <div className={styles.find}>
+          <div className={styles.findInput}>
           <header className={styles.hero}>
             <h1>요즘 뭐가 끌려?</h1>
             <p className={styles.lead}>
@@ -360,8 +366,9 @@ export default function Home() {
               수 있는 내용은 쓰지 마. 기록은 네가 저장을 켜기 전에는 이 브라우저에만 남아.
             </p>
           </div>
+          </div>
 
-          {(loading || result) && (
+          {loading || result ? (
             <div ref={resultsRef} className={styles.results}>
               {loading ? (
                 <Loading text={text.trim()} />
@@ -369,11 +376,19 @@ export default function Home() {
                 result && <Results s={result} onOpenLog={() => setTab("log")} />
               )}
             </div>
+          ) : (
+            <div className={styles.placeholder} aria-hidden="true">
+              쓰고 나면 해볼 거리가 여기에 나와.
+            </div>
           )}
-        </>
+        </div>
       )}
 
-      {tab === "log" && <LogSection interestedFields={result?.fields ?? []} />}
+      {tab === "log" && (
+        <div className={styles.logPage}>
+          <LogSection interestedFields={result?.fields ?? []} />
+        </div>
+      )}
 
       <footer className={styles.foot}>
         추천은 확인된 목록 안에서만 해. 정보는 마지막 확인일 기준이야.
