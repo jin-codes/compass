@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ITEMS } from "@/lib/items";
 import { refreshAccount, useEntries } from "@/lib/log";
+import { SECTIONS, answeredCount, tally } from "@/lib/questions";
+import type { Picks } from "@/lib/questions";
 import type { Pick, Suggestion } from "@/lib/suggest";
 import type { Budget, Equipment, Item } from "@/lib/types";
 import { LogSection, RecordButton } from "./Log";
@@ -232,6 +234,10 @@ export default function Home() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<Suggestion | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  // 표준 질문지. AI를 부르지 않고, 모두 건너뛸 수 있다.
+  const [qOpen, setQOpen] = useState(false);
+  const [step, setStep] = useState(0);
+  const [picks, setPicks] = useState<Picks>({});
 
   useEffect(() => {
     if (result || loading) resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -240,6 +246,14 @@ export default function Home() {
   const ready = text.trim().length >= 2 && !loading;
   const budgetLabel = BUDGETS.find((b) => b.value === budget)?.label;
   const equipmentLabel = EQUIPMENTS.find((e) => e.value === equipment)?.label;
+
+  function togglePick(qid: string, label: string, max: number) {
+    setPicks((p) => {
+      const cur = p[qid] ?? [];
+      if (cur.includes(label)) return { ...p, [qid]: cur.filter((x) => x !== label) };
+      return { ...p, [qid]: cur.length >= max ? cur : [...cur, label] };
+    });
+  }
 
   async function find() {
     setLoading(true);
@@ -253,6 +267,7 @@ export default function Home() {
           budget,
           hours,
           equipment,
+          hints: tally(picks),
         }),
       });
       if (res.status === 429) {
@@ -328,6 +343,77 @@ export default function Home() {
                 </button>
               ))}
             </div>
+
+            {!qOpen ? (
+              <button
+                type="button"
+                className={styles.qOpen}
+                disabled={text.trim().length < 2}
+                onClick={() => setQOpen(true)}
+              >
+                질문에 답하고 더 좁히기 <span>건너뛰어도 돼</span>
+              </button>
+            ) : (
+              <section className={styles.quiz} aria-label="질문지">
+                <div className={styles.quizHead}>
+                  <b>
+                    {SECTIONS[step].title}{" "}
+                    <span className={styles.meta}>
+                      {step + 1}/{SECTIONS.length}
+                    </span>
+                  </b>
+                  <button type="button" className={styles.link} onClick={() => setQOpen(false)}>
+                    접기
+                  </button>
+                </div>
+                <p className={styles.meta}>
+                  정답은 없어. 점수도 유형도 안 나와. 답한 것만 추천을 좁히는 데 써.
+                  {answeredCount(picks) > 0 ? ` (${answeredCount(picks)}개 답함)` : ""}
+                </p>
+                {SECTIONS[step].questions.map((qu) => (
+                  <div key={qu.id} className={styles.qBlock}>
+                    <b>
+                      {qu.q}{" "}
+                      <span className={styles.meta}>(최대 {Math.min(qu.max, qu.options.length)}개)</span>
+                    </b>
+                    <div className={styles.chips}>
+                      {qu.options.map((o) => {
+                        const on = (picks[qu.id] ?? []).includes(o.label);
+                        return (
+                          <button
+                            key={o.label}
+                            type="button"
+                            aria-pressed={on}
+                            className={on ? styles.on : ""}
+                            onClick={() => togglePick(qu.id, o.label, qu.max)}
+                          >
+                            {o.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                <div className={styles.quizNav}>
+                  <button
+                    type="button"
+                    className={styles.link}
+                    disabled={step === 0}
+                    onClick={() => setStep(step - 1)}
+                  >
+                    이전
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.link}
+                    disabled={step === SECTIONS.length - 1}
+                    onClick={() => setStep(step + 1)}
+                  >
+                    다음
+                  </button>
+                </div>
+              </section>
+            )}
 
             <details className={styles.conditions}>
               <summary>

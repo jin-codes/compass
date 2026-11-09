@@ -608,3 +608,77 @@
   }
 }
 
+/* 맞춤 질문지 */
+.qOpen {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.qOpen span {
+  color: var(--muted);
+}
+
+.qOpen:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.qBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.qBlock textarea {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  resize: vertical;
+}
+
+.quizHead,
+.quizNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quizNav button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.quizHead,
+.quizNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quizNav button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

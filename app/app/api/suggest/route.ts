@@ -2,6 +2,7 @@ import { aiAvailable, readWithAI } from "@/lib/ai";
 import { localToday } from "@/lib/date";
 import { createGuard } from "@/lib/guard";
 import { ITEMS } from "@/lib/items";
+import { cleanHints } from "@/lib/questions";
 import { isPublishable } from "@/lib/recommend";
 import { build, readBasic, sanitize } from "@/lib/suggest";
 import type { Reading } from "@/lib/suggest";
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
   if (text.length < 2 || budget === undefined || equipment === undefined || hours === undefined) {
     return Response.json({ error: "bad_request" }, { status: 400 });
   }
+  const hints = cleanHints(body.hints);
   const constraints: Constraints = { budget, hoursPerWeek: hours, equipment };
 
   const ip =
@@ -52,6 +54,12 @@ export async function POST(request: Request) {
       reading = readBasic(text);
     }
   }
+  // 학생이 질문지에서 직접 고른 선택을 읽은 결과에 합친다. AI 호출은 늘지 않는다.
+  reading = {
+    ...reading,
+    fields: [...new Set([...reading.fields, ...hints.fields])],
+    values: [...new Set([...reading.values, ...hints.values])],
+  };
   // AI를 쓸 수 있는데 한도 때문에 건너뛴 경우만 화면에 알린다.
   const busy = aiAvailable() && verdict === "keyword";
 
