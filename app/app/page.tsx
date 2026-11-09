@@ -102,8 +102,12 @@ function Loading({ text }: { text: string }) {
   return (
     <section className={styles.results} role="status" aria-live="polite" aria-busy="true">
       <div className={styles.read}>
-        <span className={styles.meta}>네가 쓴 말</span>
-        <span className={styles.echo}>{text}</span>
+        {text && (
+          <>
+            <span className={styles.meta}>네가 쓴 말</span>
+            <span className={styles.echo}>{text}</span>
+          </>
+        )}
         <span>{LOADING_STEPS[step]}…</span>
       </div>
       <div className={styles.skeleton} aria-hidden="true">
@@ -116,7 +120,7 @@ function Loading({ text }: { text: string }) {
   );
 }
 
-function Results({ s, onOpenLog }: { s: Suggestion; onOpenLog: () => void }) {
+function Results({ s, onOpenLog, hasText }: { s: Suggestion; onOpenLog: () => void; hasText: boolean }) {
   const [first, ...rest] = s.within;
   const read = [...s.fields, ...s.values];
   const nothing = !first && s.withSupport.length === 0;
@@ -125,7 +129,11 @@ function Results({ s, onOpenLog }: { s: Suggestion; onOpenLog: () => void }) {
       <div className={styles.read}>
         {read.length > 0 ? (
           <>
-            <span>이렇게 읽었어. 아니면 위 글을 고쳐서 다시 찾아봐.</span>
+            <span>
+              {hasText
+                ? "이렇게 읽었어. 아니면 위 글을 고쳐서 다시 찾아봐."
+                : "고른 답으로 읽었어. 글도 한두 문장 써주면 더 잘 맞출 수 있어."}
+            </span>
             <div className={styles.tags}>
               {read.map((t) => (
                 <span key={t}>{t}</span>
@@ -138,7 +146,7 @@ function Results({ s, onOpenLog }: { s: Suggestion; onOpenLog: () => void }) {
             한두 문장만 더 써줘.
           </span>
         )}
-        {s.mode === "basic" && (
+        {s.mode === "basic" && hasText && (
           <span className={styles.meta}>
             {s.busy
               ? "지금 AI를 쓰는 사람이 많아서 이번에는 단어로만 읽었어. 조금 있다 다시 해보면 더 잘 읽어."
@@ -233,6 +241,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Suggestion | null>(null);
+  const [resultHadText, setResultHadText] = useState(true);
   const resultsRef = useRef<HTMLDivElement>(null);
   // 표준 질문지. AI를 부르지 않고, 모두 건너뛸 수 있다.
   const [qOpen, setQOpen] = useState(false);
@@ -243,7 +252,7 @@ export default function Home() {
     if (result || loading) resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [result, loading]);
 
-  const ready = text.trim().length >= 2 && !loading;
+  const ready = (text.trim().length >= 2 || answeredCount(picks) > 0) && !loading;
   const budgetLabel = BUDGETS.find((b) => b.value === budget)?.label;
   const equipmentLabel = EQUIPMENTS.find((e) => e.value === equipment)?.label;
 
@@ -276,6 +285,7 @@ export default function Home() {
       }
       if (!res.ok) throw new Error(String(res.status));
       setResult((await res.json()) as Suggestion);
+      setResultHadText(text.trim().length >= 2);
     } catch {
       setError("지금은 못 찾았어. 잠시 뒤에 다시 눌러봐.");
     } finally {
@@ -348,7 +358,6 @@ export default function Home() {
               <button
                 type="button"
                 className={styles.qOpen}
-                disabled={text.trim().length < 2}
                 onClick={() => setQOpen(true)}
               >
                 질문에 답하고 더 좁히기 <span>건너뛰어도 돼</span>
@@ -459,7 +468,7 @@ export default function Home() {
               {loading ? (
                 <Loading text={text.trim()} />
               ) : (
-                result && <Results s={result} onOpenLog={() => setTab("log")} />
+                result && <Results s={result} onOpenLog={() => setTab("log")} hasText={resultHadText} />
               )}
             </div>
           ) : (

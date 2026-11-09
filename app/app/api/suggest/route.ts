@@ -27,10 +27,12 @@ export async function POST(request: Request) {
   const budget = BUDGETS.find((b) => b === body.budget);
   const equipment = EQUIPMENTS.find((e) => e === body.equipment);
   const hours = typeof body.hours === "number" && body.hours > 0 && body.hours <= 40 ? body.hours : undefined;
-  if (text.length < 2 || budget === undefined || equipment === undefined || hours === undefined) {
+  const hintsIn = cleanHints(body.hints);
+  const hasHints = hintsIn.fields.length + hintsIn.values.length > 0;
+  if ((text.length < 2 && !hasHints) || budget === undefined || equipment === undefined || hours === undefined) {
     return Response.json({ error: "bad_request" }, { status: 400 });
   }
-  const hints = cleanHints(body.hints);
+  const hints = hintsIn;
   const constraints: Constraints = { budget, hoursPerWeek: hours, equipment };
 
   const ip =
@@ -46,7 +48,8 @@ export async function POST(request: Request) {
   // 학생이 쓴 글은 저장하거나 기록하지 않는다. 읽는 동안만 쓴다.
   let reading: Reading = readBasic(text);
   let mode: "ai" | "basic" = "basic";
-  if (aiAvailable() && verdict === "ai") {
+  // 글 없이 질문지만 고른 경우에는 읽을 글이 없으니 AI를 부르지 않는다.
+  if (aiAvailable() && verdict === "ai" && text.length >= 2) {
     try {
       reading = sanitize(await readWithAI(text, published), published);
       mode = "ai";
@@ -61,7 +64,7 @@ export async function POST(request: Request) {
     values: [...new Set([...reading.values, ...hints.values])],
   };
   // AI를 쓸 수 있는데 한도 때문에 건너뛴 경우만 화면에 알린다.
-  const busy = aiAvailable() && verdict === "keyword";
+  const busy = aiAvailable() && verdict === "keyword" && text.length >= 2;
 
   return Response.json({
     ...build(ITEMS, reading, constraints, today, mode),
