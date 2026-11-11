@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ITEMS } from "@/lib/items";
 import { refreshAccount, useEntries } from "@/lib/log";
-import { SECTIONS, answeredCount, tally } from "@/lib/questions";
-import type { Picks } from "@/lib/questions";
+import { localToday } from "@/lib/date";
+import { FIELD_OPTIONS } from "@/lib/items";
+import { isPublishable } from "@/lib/recommend";
 import type { Pick, Suggestion } from "@/lib/suggest";
 import type { Budget, Equipment, Item } from "@/lib/types";
 import { LogSection, RecordButton } from "./Log";
@@ -120,6 +121,70 @@ function Loading({ text }: { text: string }) {
   );
 }
 
+const noop = () => () => {};
+
+/** 읽어낸 분야 순서대로 묶는다. 분야가 안 겹치고 가치관으로만 닿은 것은 마지막에 모은다. */
+function groupByField(picks: Pick[], fields: string[]): [string, Pick[]][] {
+  const groups = new Map<string, Pick[]>();
+  for (const p of picks) {
+    const item = itemById(p.id);
+    if (!item) continue;
+    const key = item.fields.find((f) => fields.includes(f)) ?? "가치관으로 닿은 것";
+    groups.set(key, [...(groups.get(key) ?? []), p]);
+  }
+  const order = [...fields, "가치관으로 닿은 것"];
+  return [...groups.entries()].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+}
+
+/**
+ * 글을 쓰지 않아도 확인된 목록 전체를 분야별로 둘러본다. AI를 부르지 않는다.
+ * 순서는 목록 순서 그대로다. 서열이나 인기순을 만들지 않는다.
+ */
+function Browse({ onOpenLog, open }: { onOpenLog: () => void; open?: boolean }) {
+  // 마감 판단은 학생 기기의 오늘 날짜로 한다. 미리 렌더할 때 날짜가 굳지 않게 마운트 뒤에 읽는다.
+  const today = useSyncExternalStore(noop, localToday, () => null);
+  if (!today) return null;
+  const published = ITEMS.filter((i) => isPublishable(i, today) && i.kind !== "support");
+  const supports = ITEMS.filter((i) => isPublishable(i, today) && i.kind === "support");
+  const groups = FIELD_OPTIONS.map(
+    (f) => [f, published.filter((i) => i.fields[0] === f)] as const
+  ).filter(([, xs]) => xs.length > 0);
+  return (
+    <section className={styles.browse} aria-label="전체 둘러보기">
+      <h2>
+        전체 둘러보기 <span className={styles.meta}>{published.length}개</span>
+      </h2>
+      <p className={styles.meta}>
+        안 써도 돼. 확인된 목록을 분야별로 다 열어뒀어. 끌리는 것부터 눌러봐.
+      </p>
+      {groups.map(([f, xs], i) => (
+        <details key={f} className={styles.group} open={open && i === 0}>
+          <summary>
+            <b>{f}</b> <span className={styles.meta}>{xs.length}</span>
+          </summary>
+          <div className={styles.results}>
+            {xs.map((x) => (
+              <Card key={x.id} pick={{ id: x.id }} onOpenLog={onOpenLog} />
+            ))}
+          </div>
+        </details>
+      ))}
+      {supports.length > 0 && (
+        <details className={styles.group}>
+          <summary>
+            <b>지원 안내</b> <span className={styles.meta}>{supports.length}</span>
+          </summary>
+          <div className={styles.results}>
+            {supports.map((x) => (
+              <Card key={x.id} pick={{ id: x.id }} onOpenLog={onOpenLog} />
+            ))}
+          </div>
+        </details>
+      )}
+    </section>
+  );
+}
+
 function Results({ s, onOpenLog, hasText }: { s: Suggestion; onOpenLog: () => void; hasText: boolean }) {
   const [first, ...rest] = s.within;
   const read = [...s.fields, ...s.values];
@@ -168,14 +233,16 @@ function Results({ s, onOpenLog, hasText }: { s: Suggestion; onOpenLog: () => vo
         </>
       )}
 
-      {rest.length > 0 && (
-        <>
-          <h2>다른 선택지</h2>
-          {rest.map((p) => (
+      {groupByField(rest, s.fields).map(([label, picks]) => (
+        <div key={label} className={styles.results}>
+          <h2>
+            {label} <span className={styles.meta}>{picks.length}</span>
+          </h2>
+          {picks.map((p) => (
             <Card key={p.id} pick={p} onOpenLog={onOpenLog} />
           ))}
-        </>
-      )}
+        </div>
+      ))}
 
       {s.widen && read.length > 0 && (
         <>
@@ -243,26 +310,14 @@ export default function Home() {
   const [result, setResult] = useState<Suggestion | null>(null);
   const [resultHadText, setResultHadText] = useState(true);
   const resultsRef = useRef<HTMLDivElement>(null);
-  // 표준 질문지. AI를 부르지 않고, 모두 건너뛸 수 있다.
-  const [qOpen, setQOpen] = useState(false);
-  const [step, setStep] = useState(0);
-  const [picks, setPicks] = useState<Picks>({});
 
   useEffect(() => {
     if (result || loading) resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [result, loading]);
 
-  const ready = (text.trim().length >= 2 || answeredCount(picks) > 0) && !loading;
+  const ready = text.trim().length >= 2 && !loading;
   const budgetLabel = BUDGETS.find((b) => b.value === budget)?.label;
   const equipmentLabel = EQUIPMENTS.find((e) => e.value === equipment)?.label;
-
-  function togglePick(qid: string, label: string, max: number) {
-    setPicks((p) => {
-      const cur = p[qid] ?? [];
-      if (cur.includes(label)) return { ...p, [qid]: cur.filter((x) => x !== label) };
-      return { ...p, [qid]: cur.length >= max ? cur : [...cur, label] };
-    });
-  }
 
   async function find() {
     setLoading(true);
@@ -276,7 +331,6 @@ export default function Home() {
           budget,
           hours,
           equipment,
-          hints: tally(picks),
         }),
       });
       if (res.status === 429) {
@@ -333,8 +387,8 @@ export default function Home() {
           <header className={styles.hero}>
             <h1>요즘 뭐가 끌려?</h1>
             <p className={styles.lead}>
-              해본 것, 궁금한 것, 시간 가는 줄 몰랐던 순간을 편하게 써줘. 직업을 정해주지 않고,
-              이번 주에 해볼 거리를 보여줄게.
+              해본 것, 궁금한 것, 시간 가는 줄 몰랐던 순간을 한두 문장 써줘. 직업을 정해주지 않고,
+              맞는 해볼 거리를 전부 펼쳐줄게. 안 써도 목록을 그냥 둘러봐도 돼.
             </p>
           </header>
 
@@ -353,76 +407,6 @@ export default function Home() {
                 </button>
               ))}
             </div>
-
-            {!qOpen ? (
-              <button
-                type="button"
-                className={styles.qOpen}
-                onClick={() => setQOpen(true)}
-              >
-                질문에 답하고 더 좁히기 <span>건너뛰어도 돼</span>
-              </button>
-            ) : (
-              <section className={styles.quiz} aria-label="질문지">
-                <div className={styles.quizHead}>
-                  <b>
-                    {SECTIONS[step].title}{" "}
-                    <span className={styles.meta}>
-                      {step + 1}/{SECTIONS.length}
-                    </span>
-                  </b>
-                  <button type="button" className={styles.link} onClick={() => setQOpen(false)}>
-                    접기
-                  </button>
-                </div>
-                <p className={styles.meta}>
-                  정답은 없어. 점수도 유형도 안 나와. 답한 것만 추천을 좁히는 데 써.
-                  {answeredCount(picks) > 0 ? ` (${answeredCount(picks)}개 답함)` : ""}
-                </p>
-                {SECTIONS[step].questions.map((qu) => (
-                  <div key={qu.id} className={styles.qBlock}>
-                    <b>
-                      {qu.q}{" "}
-                      <span className={styles.meta}>(최대 {Math.min(qu.max, qu.options.length)}개)</span>
-                    </b>
-                    <div className={styles.chips}>
-                      {qu.options.map((o) => {
-                        const on = (picks[qu.id] ?? []).includes(o.label);
-                        return (
-                          <button
-                            key={o.label}
-                            type="button"
-                            aria-pressed={on}
-                            className={on ? styles.on : ""}
-                            onClick={() => togglePick(qu.id, o.label, qu.max)}
-                          >
-                            {o.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-                <div className={styles.quizNav}>
-                  <button
-                    type="button"
-                    className={styles.link}
-                    disabled={step === 0}
-                    onClick={() => setStep(step - 1)}
-                  >
-                    이전
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.link}
-                    disabled={step === SECTIONS.length - 1}
-                    onClick={() => setStep(step + 1)}
-                  >
-                    다음
-                  </button>
-                </div>
-              </section>
-            )}
 
             <details className={styles.conditions}>
               <summary>
@@ -468,13 +452,16 @@ export default function Home() {
               {loading ? (
                 <Loading text={text.trim()} />
               ) : (
-                result && <Results s={result} onOpenLog={() => setTab("log")} hasText={resultHadText} />
+                result && (
+                  <>
+                    <Results s={result} onOpenLog={() => setTab("log")} hasText={resultHadText} />
+                    <Browse onOpenLog={() => setTab("log")} />
+                  </>
+                )
               )}
             </div>
           ) : (
-            <div className={styles.placeholder} aria-hidden="true">
-              쓰고 나면 해볼 거리가 여기에 나와.
-            </div>
+            <Browse onOpenLog={() => setTab("log")} open />
           )}
         </div>
       )}

@@ -86,7 +86,7 @@ test("넓히기는 가치관이 닿는 쪽을 먼저 고른다", () => {
   assert.equal(w.id, "b");
 });
 
-test("build: 이유는 목록 안의 항목에만 붙고 상위 3개까지만 나온다", () => {
+test("build: 이유는 목록 안의 항목에만 붙고 맞는 항목은 자르지 않는다", () => {
   const many = Array.from({ length: 6 }, (_, i) => ch(`d${i}`, ["데이터·분석"]));
   const reading: Reading = {
     fields: ["데이터·분석"],
@@ -94,7 +94,7 @@ test("build: 이유는 목록 안의 항목에만 붙고 상위 3개까지만 �
     reasons: [{ id: "d1", reason: "이유" }],
   };
   const s = build(many, reading, free, TODAY, "ai");
-  assert.equal(s.within.length, 3);
+  assert.equal(s.within.length, 6);
   assert.equal(s.mode, "ai");
   const withReason = s.within.find((p) => p.id === "d1");
   if (withReason) assert.equal(withReason.reason, "이유");
@@ -114,7 +114,7 @@ test("build: AI가 이유를 쓴 항목이 먼저 나오고 나머지는 기존 
   };
   const s = build(list, reading, free, TODAY, "ai");
   assert.equal(s.within[0].id, "c");
-  assert.deepEqual(s.within.slice(1).map((p) => p.id), ["a", "b"]);
+  assert.deepEqual(s.within.slice(1).map((p) => p.id), ["a", "b", "d"]);
 });
 
 test("build: 읽어낸 게 없으면 추천도 없다", () => {

@@ -124,6 +124,7 @@ export function build(
   );
   const reasonOf = new Map(reading.reasons.map((r) => [r.id, r.reason]));
   const pick = (id: string): Pick => ({ id, reason: reasonOf.get(id) });
+  // 맞는 항목은 자르지 않고 전부 보여준다. 학생에게 더 묻는 대신 넓게 펼친다.
   // AI가 이유를 쓴 항목을 먼저 보여준다. 같은 조건이면 기존 순서를 지킨다(정렬은 안정적이다).
   const reasonFirst = <T extends { item: Item }>(recs: T[]): T[] =>
     [...recs].sort((a, b) => Number(reasonOf.has(b.item.id)) - Number(reasonOf.has(a.item.id)));
@@ -132,8 +133,8 @@ export function build(
     mode,
     fields: reading.fields,
     values: reading.values,
-    within: reasonFirst(result.within).slice(0, 3).map((r) => pick(r.item.id)),
-    withSupport: reasonFirst(result.withSupport).slice(0, 2).map((r) => pick(r.item.id)),
+    within: reasonFirst(result.within).map((r) => pick(r.item.id)),
+    withSupport: reasonFirst(result.withSupport).map((r) => pick(r.item.id)),
     supports: result.supports.map((s) => s.id),
     widen: widen ? pick(widen.id) : undefined,
   };

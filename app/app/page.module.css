@@ -682,3 +682,33 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* 전체 둘러보기 */
+.browse {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.browse h2 {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.group {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0 14px;
+}
+
+.group summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+
+.group[open] {
+  padding-bottom: 14px;
+}
