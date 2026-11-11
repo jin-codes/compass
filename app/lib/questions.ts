@@ -397,3 +397,83 @@ export function cleanHints(raw: unknown): { fields: string[]; values: string[] }
       : [];
   return { fields: keep(r.fields, FIELD_OPTIONS), values: keep(r.values, VALUE_OPTIONS) };
 }
+
+/**
+ * "나 알아가기"의 묶음. 한 묶음은 8개이고, 묶음마다 해본 일·분야·가치를 섞어서
+ * 한 묶음만 하고 멈춰도 분야와 가치가 둘 다 보이게 한다. 뒤 묶음일수록 더 구체적인 질문이다.
+ */
+export const ROUNDS: { title: string; ids: string[] }[] = [
+  {
+    title: "가볍게",
+    ids: ["flow", "eyes", "free", "asked", "proud", "used", "stuck", "month2"],
+  },
+  {
+    title: "조금 더",
+    ids: ["month", "search", "class", "matter", "praise", "learn", "want", "together"],
+  },
+  {
+    title: "더 깊게",
+    ids: ["finish", "friends", "feed", "problem", "role", "annoy", "task", "vacation"],
+  },
+  {
+    title: "끝까지",
+    ids: ["share", "tools", "surprise", "deadline", "after", "model", "hear", "new"],
+  },
+];
+
+export const questionById = (id: string): Question | undefined =>
+  ALL_QUESTIONS.find((x) => x.id === id);
+
+export interface Seen {
+  tag: string;
+  /** 이 태그로 이어진, 학생이 실제로 고른 답 (최대 2개) */
+  because: string[];
+}
+
+/**
+ * 고른 답에서 보이는 분야와 가치. 유형·점수·순위로 보여주지 않고,
+ * 어떤 답에서 그렇게 보였는지 근거를 같이 붙인다.
+ */
+export function profile(picks: Picks): { fields: Seen[]; values: Seen[]; answered: number } {
+  const { fields, values } = tally(picks);
+  const because = (tag: string) => {
+    const out: string[] = [];
+    for (const question of ALL_QUESTIONS)
+      for (const o of question.options)
+        if (
+          (picks[question.id] ?? []).includes(o.label) &&
+          (o.fields?.includes(tag) || o.values?.includes(tag)) &&
+          out.length < 2
+        )
+          out.push(o.label);
+    return out;
+  };
+  return {
+    fields: fields.map((tag) => ({ tag, because: because(tag) })),
+    values: values.map((tag) => ({ tag, because: because(tag) })),
+    answered: answeredCount(picks),
+  };
+}
+
+/**
+ * 아직 하나도 안 연 첫 묶음. 건너뛴 질문은 "건너뛰기"를 존중해 다시 들이밀지 않는다
+ * (답 고치기로 돌아갈 수 있다). 모든 묶음에 답이 있으면 -1.
+ */
+export function nextRound(picks: Picks): number {
+  return ROUNDS.findIndex((r) => r.ids.every((id) => (picks[id] ?? []).length === 0));
+}
+
+/** 저장된 값에서 실제 질문과 선택지에 있는 것만 남긴다. */
+export function cleanPicks(raw: unknown): Picks {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Picks = {};
+  for (const question of ALL_QUESTIONS) {
+    const xs = (raw as Record<string, unknown>)[question.id];
+    if (!Array.isArray(xs)) continue;
+    const labels = question.options.map((o) => o.label);
+    const kept = [...new Set(xs.filter((x): x is string => typeof x === "string" && labels.includes(x)))]
+      .slice(0, question.max);
+    if (kept.length) out[question.id] = kept;
+  }
+  return out;
+}

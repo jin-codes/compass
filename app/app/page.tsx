@@ -9,6 +9,9 @@ import { isPublishable } from "@/lib/recommend";
 import type { Pick, Suggestion } from "@/lib/suggest";
 import type { Budget, Equipment, Item } from "@/lib/types";
 import { LogSection, RecordButton } from "./Log";
+import { Quiz } from "./Quiz";
+import { useAnswers } from "@/lib/answers";
+import { answeredCount, tally } from "@/lib/questions";
 import styles from "./page.module.css";
 
 const BUDGETS: { value: Budget; label: string }[] = [
@@ -300,7 +303,10 @@ export default function Home() {
     void refreshAccount();
   }, []);
   const entries = useEntries();
-  const [tab, setTab] = useState<"find" | "log">("find");
+  const [tab, setTab] = useState<"find" | "me" | "log">("find");
+  // 나 알아가기 답. 고른 답에서 보인 분야·가치 이름만 요청에 붙는다(AI 호출은 늘지 않는다).
+  const answers = useAnswers();
+  const answered = answeredCount(answers);
   const [text, setText] = useState("");
   const [budget, setBudget] = useState<Budget>(0);
   const [hours, setHours] = useState(2);
@@ -315,7 +321,7 @@ export default function Home() {
     if (result || loading) resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [result, loading]);
 
-  const ready = text.trim().length >= 2 && !loading;
+  const ready = (text.trim().length >= 2 || answered > 0) && !loading;
   const budgetLabel = BUDGETS.find((b) => b.value === budget)?.label;
   const equipmentLabel = EQUIPMENTS.find((e) => e.value === equipment)?.label;
 
@@ -331,6 +337,7 @@ export default function Home() {
           budget,
           hours,
           equipment,
+          hints: tally(answers),
         }),
       });
       if (res.status === 429) {
@@ -375,6 +382,9 @@ export default function Home() {
           <button type="button" aria-pressed={tab === "find"} onClick={() => setTab("find")}>
             찾기
           </button>
+          <button type="button" aria-pressed={tab === "me"} onClick={() => setTab("me")}>
+            나 알아가기
+          </button>
           <button type="button" aria-pressed={tab === "log"} onClick={() => setTab("log")}>
             내 기록{entries.length > 0 ? ` ${entries.length}` : ""}
           </button>
@@ -407,6 +417,25 @@ export default function Home() {
                 </button>
               ))}
             </div>
+
+            <p className={styles.meta}>
+              {answered > 0 ? (
+                <>
+                  나 알아가기 답 {answered}개도 함께 반영돼.{" "}
+                  <button type="button" className={styles.link} onClick={() => setTab("me")}>
+                    보기
+                  </button>
+                </>
+              ) : (
+                <>
+                  쓰기 어려우면{" "}
+                  <button type="button" className={styles.link} onClick={() => setTab("me")}>
+                    나 알아가기
+                  </button>
+                  에서 골라서 답해도 돼. 안 해도 돼.
+                </>
+              )}
+            </p>
 
             <details className={styles.conditions}>
               <summary>
@@ -463,6 +492,17 @@ export default function Home() {
           ) : (
             <Browse onOpenLog={() => setTab("log")} open />
           )}
+        </div>
+      )}
+
+      {tab === "me" && (
+        <div className={styles.logPage}>
+          <Quiz
+            onSee={() => {
+              setTab("find");
+              void find();
+            }}
+          />
         </div>
       )}
 
